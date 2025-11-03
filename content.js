@@ -12,6 +12,10 @@ chrome.runtime.onMessage.addListener((message) => {
   console.log("📩 Received message:", message);
 });
 
+function logToSidebar(text) {
+  chrome.runtime.sendMessage({ action: 'log', text });
+}
+
 
 function logToSidebar(text) {
   chrome.runtime.sendMessage({ action: 'log', text });
@@ -117,21 +121,78 @@ async function processNextComment() {
 
 // === MỞ HỘP REPLY ===
 async function openReplyBox(commentEl) {
-  hideReplyBox(); // Đóng hộp cũ
+  hideReplyBox();
+  commentEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  await new Promise(r => setTimeout(r, 400));
+
   const replyBtn = commentEl.querySelector('#reply-button button');
-  if (replyBtn) {
-    replyBtn.click();
-    // Đợi hộp reply hiện
-    await new Promise(r => setTimeout(r, 800));
+  if (!replyBtn) {
+    chrome.runtime.sendMessage({ action: 'log', text: '❌ Không thấy nút Phản hồi trong comment hiện tại.' });
+    return false;
   }
+
+  replyBtn.click();
+  await new Promise(r => setTimeout(r, 500));
+  return true;
+}
+
+// CHỜ hộp input/submit xuất hiện trong đúng comment
+async function waitForReplyBoxIn(commentEl, timeout = 6000) {
+  const start = Date.now();
+  while (Date.now() - start < timeout) {
+    const boxContainer = commentEl.querySelector('#reply-dialog-container');
+    const textarea = boxContainer?.querySelector('textarea#textarea');
+    const sendBtn  = boxContainer?.querySelector('#submit-button button');
+    if (textarea && sendBtn) return { boxContainer, textarea, sendBtn };
+    await new Promise(r => setTimeout(r, 300));
+  }
+  return null;
+}
+
+
+// ĐIỀN + GỬI, scope theo comment
+async function fillAndSendReplyIn(commentEl, replyText) {
+  const found = await waitForReplyBoxIn(commentEl, 6000);
+  if (!found) {
+    chrome.runtime.sendMessage({ action: 'log', text: '❌ Không tìm thấy input hoặc nút gửi (hộp chưa render kịp).' });
+    return false;
+  }
+
+  const { textarea, sendBtn } = found;
+
+  textarea.focus();
+  textarea.value = replyText;
+  textarea.dispatchEvent(new Event('input', { bubbles: true })); // kích hoạt binding
+
+  await new Promise(r => setTimeout(r, 800)); // cho UI cập nhật
+
+  const disabled = sendBtn.getAttribute('aria-disabled') === 'true' || sendBtn.disabled;
+  if (disabled) {
+    chrome.runtime.sendMessage({ action: 'log', text: '⚠️ Nút gửi đang bị disabled.' });
+    return false;
+  }
+
+  sendBtn.click();
+  chrome.runtime.sendMessage({ action: 'log', text: '✅ Gửi phản hồi thành công.' });
+  await new Promise(r => setTimeout(r, 1200));
+  return true;
+}
+
+// AUTO REPLY (continuous) dùng các hàm scoped
+async function autoReply(commentEl, replyText) {
+  const opened = await openReplyBox(commentEl);
+  if (!opened) return false;
+
+  const success = await fillAndSendReplyIn(commentEl, replyText);
+  return success;
 }
 
 // === ÁP DỤNG REPLY (Manual) ===
 async function applyReplyToCurrent(replyText) {
   if (!currentCommentEl) return;
   await openReplyBox(currentCommentEl);
-  await fillAndSendReply(replyText);
-  markAsReplied(currentCommentEl);
+  const ok = await fillAndSendReplyIn(currentCommentEl, replyText);
+  if (ok) markAsReplied(currentCommentEl); else markAsFailed(currentCommentEl);
   moveToNextComment();
 }
 

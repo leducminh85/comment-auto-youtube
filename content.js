@@ -61,15 +61,23 @@ function hideReplyBox() {
 
 // === TÌM COMMENT CHƯA REPLY ===
 function getUnrepliedComments() {
-  return Array.from(document.querySelectorAll('ytcp-comment'))
-    .filter(comment => {
-      // Chỉ lấy comment chưa có reply (không có ytcp-comment-reply)
-      const hasReply = comment.querySelector('ytcp-comment-reply') !== null;
-      const isReplied = comment.classList.contains('auto-replied');
-      return !hasReply && !isReplied;
-    });
-}
+  const allThreads = Array.from(document.querySelectorAll('ytcp-comment-thread'));
 
+  return allThreads.filter(thread => {
+    const mainComment = thread.querySelector('ytcp-comment#comment');
+    const hasRepliesSection = thread.querySelector('ytcp-comment-replies');
+    const repliedClass = mainComment?.classList.contains('auto-replied');
+
+    // 1️⃣ Bỏ qua comment đã được đánh dấu là "auto-replied"
+    if (repliedClass) return false;
+
+    // 2️⃣ Nếu có khối "ytcp-comment-replies" => đã có ít nhất 1 phản hồi
+    if (hasRepliesSection && hasRepliesSection.querySelector('ytcp-comment')) return false;
+
+    // 3️⃣ Ngược lại: chưa có phản hồi
+    return true;
+  });
+}
 // === LẤY COMMENT TIẾP THEO ===
 async function processNextComment() {
   if (!isRunning) return;
@@ -130,34 +138,65 @@ async function applyReplyToCurrent(replyText) {
 // === TỰ ĐỘNG REPLY (Continuous) ===
 async function autoReply(commentEl, replyText) {
   await openReplyBox(commentEl);
-  await fillAndSendReply(replyText);
+
+  // 🔸 Đợi cho đến khi hộp nhập phản hồi thực sự xuất hiện
+  const ok = await waitForReplyBox(6000); // timeout 6 giây
+  if (!ok) {
+    chrome.runtime.sendMessage({ action: 'log', text: '❌ Không tìm thấy hộp phản hồi sau 6s.' });
+    return false;
+  }
+
+  // 🔸 Khi hộp đã sẵn sàng, điền và gửi phản hồi
+  const success = await fillAndSendReply(replyText);
+  if (success) {
+    markAsReplied(commentEl);
+  } else {
+    markAsFailed(commentEl);
+  }
+  return success;
+}
+
+async function waitForReplyBox(timeout = 5000) {
+  const start = Date.now();
+  while (Date.now() - start < timeout) {
+    const box = document.querySelector('#reply-dialog-container textarea#textarea');
+    const sendBtn = document.querySelector('#reply-dialog-container #submit-button button');
+    if (box && sendBtn) return true;
+    await new Promise(r => setTimeout(r, 300));
+  }
+  return false;
 }
 
 // === ĐIỀN + GỬI REPLY ===
 async function fillAndSendReply(replyText) {
-  const replyInput = document.querySelector('ytcp-comment-reply #reply-input');
-  const sendButton = document.querySelector('ytcp-comment-reply #submit-button button');
+  const replyBox = document.querySelector('#reply-dialog-container');
+  const replyInput = replyBox?.querySelector('textarea#textarea');
+  const sendButton = replyBox?.querySelector('#submit-button button');
 
   if (!replyInput || !sendButton) {
-    console.error('Không tìm thấy input hoặc nút gửi');
+    chrome.runtime.sendMessage({ action: 'log', text: '❌ Không tìm thấy input hoặc nút gửi.' });
     return false;
   }
 
-  // Focus và nhập
+  // Focus và nhập nội dung
   replyInput.focus();
-  document.execCommand('insertText', false, replyText);
+  replyInput.value = replyText;
+  replyInput.dispatchEvent(new Event('input', { bubbles: true }));
 
-  // Đợi 1s để YouTube xử lý
-  await new Promise(r => setTimeout(r, 1000));
+  await new Promise(r => setTimeout(r, 1000)); // đợi binding Polymer
 
-  // Kiểm tra nút gửi có enable không
-  if (sendButton.getAttribute('aria-disabled') === 'false') {
+  const disabled = sendButton.getAttribute('aria-disabled') === 'true' || sendButton.disabled;
+  if (!disabled) {
     sendButton.click();
+    chrome.runtime.sendMessage({ action: 'log', text: '✅ Gửi phản hồi thành công.' });
     await new Promise(r => setTimeout(r, 1500));
     return true;
+  } else {
+    chrome.runtime.sendMessage({ action: 'log', text: '⚠️ Nút gửi bị vô hiệu hóa, chưa gửi được.' });
+    return false;
   }
-  return false;
 }
+
 
 // === ĐÁNH DẤU ĐÃ REPLY ===
 function markAsReplied(el) {

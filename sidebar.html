@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body { width: 300px; padding: 10px; font-family: Arial; }
+    input, select, button { width: 100%; margin: 5px 0; padding: 8px; }
+    #status { color: green; font-weight: bold; }
+    .mode-group { margin: 10px 0; }
+    .preview { background: #f0f0f0; padding: 10px; margin: 10px 0; border-radius: 5px; }
+  </style>
+</head>
+<body>
+  <h3>Auto Reply Gemini</h3>
+  
+  <label>API Key:</label>
+  <input type="password" id="apiKey" placeholder="Nhập Gemini API Key">
+  <button id="saveKey">Save Key</button>
+  
+  <div class="mode-group">
+    <label>Chọn Mode:</label>
+    <select id="mode">
+      <option value="continuous">1. Continuous (Tự động liên tục)</option>
+      <option value="manual">2. Manual (Preview & Xác nhận)</option>
+    </select>
+  </div>
+  
+  <button id="start">Start</button>
+  <button id="stop">Stop</button>
+  
+  <div id="status">Ready</div>
+  <div id="preview" class="preview" style="display:none;">
+    <strong>Preview Reply:</strong><br>
+    <span id="replyText"></span><br>
+    <button id="apply">Reply</button>
+    <button id="cancel">Cancel</button>
+  </div>
+    <div id="logContainer" style="margin-top:15px;">
+    <strong>Log:</strong>
+    <div id="logBox" style="
+      height:150px;
+      overflow-y:auto;
+      background:#111;
+      color:#0f0;
+      padding:8px;
+      border-radius:5px;
+      font-family:monospace;
+      font-size:12px;
+      white-space:pre-line;
+    "></div>
+    <button id="clearLog">Clear Log</button>
+  </div>
+
+  <script src="sidebar.js"></script>
+  
+</body>
+</html>

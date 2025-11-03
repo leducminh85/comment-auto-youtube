@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "Auto Reply YouTube Studio (Gemini AI)",
+  "version": "1.0",
+  "description": "Tự động reply comment trong YouTube Studio bằng Gemini AI",
+  "permissions": ["storage", "sidePanel", "activeTab", "scripting"],
+  "host_permissions": [
+    "https://generativelanguage.googleapis.com/*",
+    "https://studio.youtube.com/*"
+  ],
+  "side_panel": { "default_path": "sidebar.html" },
+  "action": { "default_title": "Mở Auto Reply Sidebar" },
+
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["https://studio.youtube.com/channel/*/comments/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

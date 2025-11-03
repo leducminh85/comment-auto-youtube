@@ -2,12 +2,127 @@
 <html>
 <head>
   <meta charset="UTF-8">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
-    body { width: 300px; padding: 10px; font-family: Arial; }
-    input, select, button { width: 100%; margin: 5px 0; padding: 8px; }
-    #status { color: green; font-weight: bold; }
-    .mode-group { margin: 10px 0; }
-    .preview { background: #f0f0f0; padding: 10px; margin: 10px 0; border-radius: 5px; }
+    body {
+      width: 300px;
+      padding: 15px;
+      font-family: 'Roboto', sans-serif;
+      background: linear-gradient(135deg, #0a0a0a, #1e1e1e);
+      color: #e0e0e0;
+      margin: 0;
+    }
+    h3 {
+      color: #00ffff;
+      text-shadow: 0 0 5px rgba(0, 255, 255, 0.5);
+      margin-bottom: 15px;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 500;
+      color: #bb86fc;
+    }
+    input, select, textarea {
+      width: 100%;
+      padding: 8px;
+      margin-bottom: 10px;
+      background: #2c2c2c;
+      border: 1px solid #00ffff;
+      border-radius: 8px;
+      color: #e0e0e0;
+      transition: all 0.3s;
+    }
+    input:focus, select:focus, textarea:focus {
+      box-shadow: 0 0 8px rgba(0, 255, 255, 0.7);
+      border-color: #bb86fc;
+    }
+    button {
+      width: 100%;
+      padding: 8px;
+      background: linear-gradient(135deg, #00ffff, #bb86fc);
+      border: none;
+      border-radius: 8px;
+      color: #0a0a0a;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.3s;
+      margin-bottom: 10px;
+    }
+    button:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 12px rgba(0, 255, 255, 0.8);
+    }
+    button:disabled {
+      background: #4a4a4a;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+    #status {
+      color: #00ff00;
+      font-weight: 500;
+      text-align: center;
+      margin: 10px 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    /* Spinner Loading */
+    .spinner {
+      display: none;
+      border: 4px solid rgba(0, 255, 255, 0.3);
+      border-top: 4px solid #00ffff;
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      animation: spin 1s linear infinite;
+      margin-left: 10px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .loading #status .spinner {
+      display: inline-block;
+    }
+    .mode-group {
+      margin: 15px 0;
+      padding: 10px;
+      background: #1e1e1e;
+      border-radius: 8px;
+      box-shadow: 0 0 5px rgba(0, 255, 255, 0.2);
+    }
+    .preview {
+      background: #2c2c2c;
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 8px;
+      border: 1px solid #bb86fc;
+      display: none;
+    }
+    .preview button {
+      width: 48%;
+      margin: 5px 1%;
+    }
+    #logContainer {
+      margin-top: 15px;
+    }
+    #logBox {
+      height: 150px;
+      overflow-y: auto;
+      background: #121212;
+      color: #00ff00;
+      padding: 10px;
+      border-radius: 8px;
+      font-family: monospace;
+      font-size: 12px;
+      white-space: pre-line;
+      border: 1px solid #00ffff;
+    }
+    small {
+      font-size: 12px;
+    }
   </style>
 </head>
 <body>
@@ -28,30 +143,26 @@
   <button id="start">Start</button>
   <button id="stop">Stop</button>
   
-  <div id="status">Ready</div>
-  <div id="preview" class="preview" style="display:none;">
+  <div id="status">Ready <div class="spinner"></div></div>
+  <div id="preview" class="preview">
     <strong>Preview Reply:</strong><br>
     <span id="replyText"></span><br>
     <button id="apply">Reply</button>
     <button id="cancel">Cancel</button>
   </div>
-    <div id="logContainer" style="margin-top:15px;">
+  <div id="logContainer">
     <strong>Log:</strong>
-    <div id="logBox" style="
-      height:150px;
-      overflow-y:auto;
-      background:#111;
-      color:#0f0;
-      padding:8px;
-      border-radius:5px;
-      font-family:monospace;
-      font-size:12px;
-      white-space:pre-line;
-    "></div>
+    <div id="logBox"></div>
     <button id="clearLog">Clear Log</button>
   </div>
 
+  <div class="mode-group">
+    <label>Prompt cho Gemini:</label>
+    <textarea id="customPrompt" rows="6" placeholder="Nhập prompt tùy chỉnh..."></textarea>
+    <button id="savePrompt">Lưu Prompt</button>
+    <button id="resetPrompt">Khôi phục mặc định</button>
+    <small id="promptStatus" style="color: #00ffff; display: block; margin-top: 5px;"></small>
+  </div>
   <script src="sidebar.js"></script>
-  
 </body>
 </html>

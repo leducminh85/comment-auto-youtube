@@ -283,7 +283,14 @@ function scrollToComment(el) {
 
 // === GỌI GEMINI API ===
 async function generateReply(commentText) {
-  const prompt = `Bạn là chủ kênh YouTube. Hãy trả lời bình luận này một cách thân thiện, tích cực, ngắn gọn bằng tiếng Việt (hoặc tiếng Anh nếu comment bằng tiếng Anh). Chỉ trả lời nội dung, không giải thích.\n\nBình luận: "${commentText}"`;
+  // Lấy prompt từ message (nếu có), nếu không thì dùng mặc định
+  const stored = await new Promise(resolve => {
+    chrome.storage.local.get(['customPrompt'], resolve);
+  });
+  const rawPrompt = stored.customPrompt || `Bạn là chủ kênh YouTube. Hãy trả lời bình luận này một cách thân thiện, tích cực, ngắn gọn bằng tiếng Việt (hoặc tiếng Anh nếu comment bằng tiếng Anh). Chỉ trả lời nội dung, không giải thích.\n\nBình luận: "${commentText}"`;
+
+  // Thay thế {{COMMENT}} nếu có
+  const prompt = rawPrompt.replace(/{{COMMENT}}/g, commentText);
 
   try {
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
@@ -295,11 +302,15 @@ async function generateReply(commentText) {
     });
 
     const data = await response.json();
-    if (data.candidates && data.candidates[0]) {
+    if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
       return data.candidates[0].content.parts[0].text.trim();
+    } else {
+      console.error('Gemini response error:', data);
+      chrome.runtime.sendMessage({ action: 'log', text: 'Gemini trả về lỗi định dạng.' });
     }
   } catch (error) {
     console.error('Gemini API error:', error);
+    chrome.runtime.sendMessage({ action: 'log', text: 'Lỗi gọi Gemini: ' + error.message });
   }
   return null;
 }

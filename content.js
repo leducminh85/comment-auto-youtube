@@ -1,21 +1,11 @@
 let isRunning = false;
 let currentMode = 'continuous';
 let apiKey = '';
-let intervalId = null;
 let currentCommentEl = null;
 
 const SCROLL_STEP = 600;
 
 console.log("✅ content.js loaded");
-
-chrome.runtime.onMessage.addListener((message) => {
-  console.log("📩 Received message:", message);
-});
-
-function logToSidebar(text) {
-  chrome.runtime.sendMessage({ action: 'log', text });
-}
-
 
 function logToSidebar(text) {
   chrome.runtime.sendMessage({ action: 'log', text });
@@ -43,15 +33,12 @@ function startProcessing() {
   chrome.runtime.sendMessage({ action: 'log', text: 'content.js: startProcessing() called' });
 
   hideReplyBox();
-  if (currentMode === 'continuous') {
-    intervalId = setInterval(processNextComment, 4000);
-  } else {
-    processNextComment();
-  }
+  
+  // Cả hai mode đều gọi 1 lần (không setInterval)
+  processNextComment();
 }
 
 function stopProcessing() {
-  if (intervalId) clearInterval(intervalId);
   hideReplyBox();
 }
 
@@ -75,13 +62,14 @@ function getUnrepliedComments() {
     // 1️⃣ Bỏ qua comment đã được đánh dấu là "auto-replied"
     if (repliedClass) return false;
 
-    // 2️⃣ Nếu có khối "ytcp-comment-replies" => đã có ít nhất 1 phản hồi
+    // 2️⃣ Nếu có khối "ytcp-comment-replies" => đã có ít nhất 1 phần hồi
     if (hasRepliesSection && hasRepliesSection.querySelector('ytcp-comment')) return false;
 
-    // 3️⃣ Ngược lại: chưa có phản hồi
+    // 3️⃣ Ngược lại: chưa có phần hồi
     return true;
   });
 }
+
 // === LẤY COMMENT TIẾP THEO ===
 async function processNextComment() {
   if (!isRunning) return;
@@ -107,16 +95,20 @@ async function processNextComment() {
     return;
   }
 
+  // Hiển thị preview cho cả continuous & manual
+  chrome.runtime.sendMessage({ action: 'showPreview', reply });
+  
+  // Mở reply box
+  await openReplyBox(currentCommentEl);
+
+  // Sự khác biệt ở đây:
   if (currentMode === 'continuous') {
-    await autoReply(currentCommentEl, reply);
-    markAsReplied(currentCommentEl);
-    scrollToComment(currentCommentEl);
-    setTimeout(moveToNextComment, 2000);
-  } else {
-    // Manual mode: Hiển thị preview
-    chrome.runtime.sendMessage({ action: 'showPreview', reply });
-    await openReplyBox(currentCommentEl);
+    // Continuous: Tự động apply sau 1s
+    setTimeout(() => {
+      autoApplyReply(reply);
+    }, 1000);
   }
+  // Manual mode: chờ user bấm apply button
 }
 
 // === MỞ HỘP REPLY ===
@@ -136,21 +128,20 @@ async function openReplyBox(commentEl) {
   return true;
 }
 
-// CHỜ hộp input/submit xuất hiện trong đúng comment
+// === CHỜ HỘP INPUT/SUBMIT XUẤT HIỆN TRONG ĐÚNG COMMENT ===
 async function waitForReplyBoxIn(commentEl, timeout = 6000) {
   const start = Date.now();
   while (Date.now() - start < timeout) {
     const boxContainer = commentEl.querySelector('#reply-dialog-container');
     const textarea = boxContainer?.querySelector('textarea#textarea');
-    const sendBtn  = boxContainer?.querySelector('#submit-button button');
+    const sendBtn = boxContainer?.querySelector('#submit-button button');
     if (textarea && sendBtn) return { boxContainer, textarea, sendBtn };
     await new Promise(r => setTimeout(r, 300));
   }
   return null;
 }
 
-
-// ĐIỀN + GỬI, scope theo comment
+// === ĐIỀN + GỬI, SCOPE THEO COMMENT ===
 async function fillAndSendReplyIn(commentEl, replyText) {
   const found = await waitForReplyBoxIn(commentEl, 6000);
   if (!found) {
@@ -178,86 +169,48 @@ async function fillAndSendReplyIn(commentEl, replyText) {
   return true;
 }
 
-// AUTO REPLY (continuous) dùng các hàm scoped
-async function autoReply(commentEl, replyText) {
-  const opened = await openReplyBox(commentEl);
-  if (!opened) return false;
-
-  const success = await fillAndSendReplyIn(commentEl, replyText);
-  return success;
-}
-
-// === ÁP DỤNG REPLY (Manual) ===
-async function applyReplyToCurrent(replyText) {
+// === CONTINUOUS MODE: TỰ ĐỘNG APPLY (HÀM MỚI) ===
+async function autoApplyReply(replyText) {
   if (!currentCommentEl) return;
-  await openReplyBox(currentCommentEl);
+
+  chrome.runtime.sendMessage({ 
+    action: 'log', 
+    text: '🤖 Auto-applying...' 
+  });
+
   const ok = await fillAndSendReplyIn(currentCommentEl, replyText);
-  if (ok) markAsReplied(currentCommentEl); else markAsFailed(currentCommentEl);
+  
+  if (ok) {
+    markAsReplied(currentCommentEl);
+  } else {
+    markAsFailed(currentCommentEl);
+  }
+
+  // Ẩn preview
+  chrome.runtime.sendMessage({ action: 'hidePreview' });
+  
+  // Sang comment tiếp theo
   moveToNextComment();
 }
 
-// === TỰ ĐỘNG REPLY (Continuous) ===
-async function autoReply(commentEl, replyText) {
-  await openReplyBox(commentEl);
+// === ÁP DỤNG REPLY (MANUAL MODE) ===
+async function applyReplyToCurrent(replyText) {
+  if (!currentCommentEl) return;
 
-  // 🔸 Đợi cho đến khi hộp nhập phản hồi thực sự xuất hiện
-  const ok = await waitForReplyBox(6000); // timeout 6 giây
-  if (!ok) {
-    chrome.runtime.sendMessage({ action: 'log', text: '❌ Không tìm thấy hộp phản hồi sau 6s.' });
-    return false;
-  }
-
-  // 🔸 Khi hộp đã sẵn sàng, điền và gửi phản hồi
-  const success = await fillAndSendReply(replyText);
-  if (success) {
-    markAsReplied(commentEl);
+  const ok = await fillAndSendReplyIn(currentCommentEl, replyText);
+  
+  if (ok) {
+    markAsReplied(currentCommentEl);
   } else {
-    markAsFailed(commentEl);
+    markAsFailed(currentCommentEl);
   }
-  return success;
+
+  // Ẩn preview
+  chrome.runtime.sendMessage({ action: 'hidePreview' });
+  
+  // Sang comment tiếp theo
+  moveToNextComment();
 }
-
-async function waitForReplyBox(timeout = 5000) {
-  const start = Date.now();
-  while (Date.now() - start < timeout) {
-    const box = document.querySelector('#reply-dialog-container textarea#textarea');
-    const sendBtn = document.querySelector('#reply-dialog-container #submit-button button');
-    if (box && sendBtn) return true;
-    await new Promise(r => setTimeout(r, 300));
-  }
-  return false;
-}
-
-// === ĐIỀN + GỬI REPLY ===
-async function fillAndSendReply(replyText) {
-  const replyBox = document.querySelector('#reply-dialog-container');
-  const replyInput = replyBox?.querySelector('textarea#textarea');
-  const sendButton = replyBox?.querySelector('#submit-button button');
-
-  if (!replyInput || !sendButton) {
-    chrome.runtime.sendMessage({ action: 'log', text: '❌ Không tìm thấy input hoặc nút gửi.' });
-    return false;
-  }
-
-  // Focus và nhập nội dung
-  replyInput.focus();
-  replyInput.value = replyText;
-  replyInput.dispatchEvent(new Event('input', { bubbles: true }));
-
-  await new Promise(r => setTimeout(r, 1000)); // đợi binding Polymer
-
-  const disabled = sendButton.getAttribute('aria-disabled') === 'true' || sendButton.disabled;
-  if (!disabled) {
-    sendButton.click();
-    chrome.runtime.sendMessage({ action: 'log', text: '✅ Gửi phản hồi thành công.' });
-    await new Promise(r => setTimeout(r, 1500));
-    return true;
-  } else {
-    chrome.runtime.sendMessage({ action: 'log', text: '⚠️ Nút gửi bị vô hiệu hóa, chưa gửi được.' });
-    return false;
-  }
-}
-
 
 // === ĐÁNH DẤU ĐÃ REPLY ===
 function markAsReplied(el) {

@@ -135,23 +135,35 @@ document.addEventListener('DOMContentLoaded', () => {
     setProcessing(false);
   });
 
-  // === PREVIEW ===
+  // === PREVIEW & LOG MESSAGES ===
   chrome.runtime.onMessage.addListener((msg) => {
     if (msg.action === 'showPreview') {
       preview.style.display = 'block';
       replyText.textContent = msg.reply;
       appendLog('Preview ready');
     }
-    if (msg.action === 'log') appendLog(msg.text);
+    
+    if (msg.action === 'hidePreview') {
+      preview.style.display = 'none';
+    }
+    
+    if (msg.action === 'log') {
+      appendLog(msg.text);
+    }
   });
 
+  // === APPLY BUTTON (MANUAL MODE) ===
   applyBtn.addEventListener('click', () => {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      chrome.tabs.sendMessage(tabs[0].id, { action: 'applyReply', reply: replyText.textContent });
+      chrome.tabs.sendMessage(tabs[0].id, { 
+        action: 'applyReply', 
+        reply: replyText.textContent 
+      });
     });
     preview.style.display = 'none';
   });
 
+  // === CANCEL BUTTON (CẢ HAI MODE) ===
   cancelBtn.addEventListener('click', () => {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       chrome.tabs.sendMessage(tabs[0].id, { action: 'nextComment' });
@@ -159,11 +171,12 @@ document.addEventListener('DOMContentLoaded', () => {
     preview.style.display = 'none';
   });
 
-  // === LOG ===
+  // === LOG FUNCTION ===
   function appendLog(msg) {
     const t = new Date().toLocaleTimeString();
     logBox.textContent += `[${t}] ${msg}\n`;
     logBox.scrollTop = logBox.scrollHeight;
   }
+
   clearLog.addEventListener('click', () => logBox.textContent = '');
 });

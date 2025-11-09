@@ -227,18 +227,32 @@ function moveToNextComment() {
 async function generateReply(commentText, retries = 3) {
   for (let i = 0; i < retries; i++) {
     try {
+      // LẤY LỊCH SỬ CHAT
       const stored = await new Promise(resolve => {
-        chrome.storage.local.get(['customPrompt'], resolve);
+        chrome.storage.local.get(['customPrompt', 'chatHistory'], resolve);
       });
-      const rawPrompt = stored.customPrompt || `Bạn là chủ kênh YouTube. Hãy trả lời bình luận này một cách thân thiện, tích cực, ngắn gọn bằng tiếng Việt (hoặc tiếng Anh nếu comment bằng tiếng Anh). Chỉ trả lời nội dung, không giải thích.\n\nBình luận: "${commentText}"`;
-      const prompt = rawPrompt.replace(/{{COMMENT}}/g, commentText);
+
+      const rawPrompt = stored.customPrompt || `Bạn là chủ kênh YouTube. Hãy trả lời bình luận này một cách thân thiện, tích cực, ngắn gọn bằng tiếng Việt (hoặc tiếng Anh nếu comment bằng tiếng Anh). Chỉ trả lời nội dung, không giải thích.\n\nBình luận: "{{COMMENT}}"`;
+
+      // TẠO PROMPT CÓ NGỮ CẢNH TỪ CHAT
+      let contents = [];
+
+      // Thêm lịch sử chat (nếu có)
+      if (stored.chatHistory && Array.isArray(stored.chatHistory)) {
+        contents = stored.chatHistory.map(msg => ({
+          role: msg.role === 'user' ? 'user' : 'model',
+          parts: [{ text: msg.parts[0].text }]
+        }));
+      }
+
+      // Thêm prompt chính
+      const finalPrompt = rawPrompt.replace(/{{COMMENT}}/g, commentText);
+      contents.push({ role: 'user', parts: [{ text: finalPrompt }] });
 
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }]
-        })
+        body: JSON.stringify({ contents })
       });
 
       const data = await response.json();

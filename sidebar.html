@@ -376,6 +376,51 @@
     <small id="promptStatus"></small>
   </div>
 
+  <!-- Thêm vào trước </body> hoặc sau phần prompt-editor -->
+<div class="collapsible" id="chatbotToggle">
+  <span>🤖 Chatbot AI</span>
+  <span class="arrow">›</span>
+</div>
+<div class="collapse-content" id="chatbotContent">
+  <div id="chatMessages" style="
+    height: 200px;
+    overflow-y: auto;
+    background: #0a0a0a;
+    border: 1px solid var(--neon-cyan);
+    border-radius: 6px;
+    padding: 8px;
+    margin-bottom: 8px;
+    font-size: 11px;
+    line-height: 1.4;
+  "></div>
+  <div style="display: flex; gap: 5px;">
+    <input type="text" id="chatInput" placeholder="Hỏi AI..." style="
+      flex: 1;
+      background: #333;
+      border: 1px solid var(--neon-purple);
+      color: var(--text);
+      padding: 8px;
+      border-radius: 6px;
+      font-size: 11px;
+            min-width: 50px;
+
+    ">
+    <button id="sendChat" style="
+      padding: 8px 10px;
+      font-size: 11px;
+      min-width: 50px;
+    ">Gửi</button>
+  </div>
+  <button id="clearChat" style="
+    margin-top: 5px;
+    padding: 6px;
+    font-size: 10px;
+    background: #444;
+  ">Xóa lịch sử</button>
+</div>
+
   <script src="sidebar.js"></script>
+
+  
 </body>
 </html>

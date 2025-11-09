@@ -24,9 +24,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   } else if (message.action === 'applyReply') {
     applyReplyToCurrent(message.reply);
   } else if (message.action === 'skipAndNext') {
-    // ✅ FIX SKIP - ĐÓNG REPLY BOX + CLEAR CURRENT + CHUYỂN COMMENT MỚI
+    // ĐÁNH DẤU LÀ SKIP + ĐÓNG HỘP + CHUYỂN COMMENT MỚI
+    if (currentCommentEl) {
+      markAsSkipped(currentCommentEl);
+    }
     hideReplyBox();
-    currentCommentEl = null;  // ← THÊM DÒNG NÀY
+    currentCommentEl = null;
     chrome.runtime.sendMessage({ action: 'hidePreview' });
     moveToNextComment();
   } else if (message.action === 'regenerate') {
@@ -52,13 +55,17 @@ function hideReplyBox() {
   }
 }
 
+// CẬP NHẬT: Loại bỏ cả comment đã reply và đã skip
 function getUnrepliedComments() {
   const allThreads = Array.from(document.querySelectorAll('ytcp-comment-thread'));
   return allThreads.filter(thread => {
     const mainComment = thread.querySelector('ytcp-comment#comment');
     const hasRepliesSection = thread.querySelector('ytcp-comment-replies');
     const repliedClass = mainComment?.classList.contains('auto-replied');
-    if (repliedClass) return false;
+    const skippedClass = mainComment?.classList.contains('auto-skipped');
+
+    // Bỏ qua nếu đã reply HOẶC đã skip
+    if (repliedClass || skippedClass) return false;
     if (hasRepliesSection && hasRepliesSection.querySelector('ytcp-comment')) return false;
     return true;
   });
@@ -97,7 +104,7 @@ async function processNextComment() {
   if (currentMode === 'continuous') {
     setTimeout(() => {
       autoApplyReply(reply);
-    }, 1000); // 1s delay cố định
+    }, 1000);
   }
 }
 
@@ -190,17 +197,27 @@ async function regenerateCurrentReply() {
   }
 }
 
+// ĐÁNH DẤU ĐÃ TRẢ LỜI
 function markAsReplied(el) {
-  el.classList.add('auto-replied');
+  const mainComment = el.querySelector('ytcp-comment#comment');
+  if (mainComment) mainComment.classList.add('auto-replied');
   el.style.borderLeft = '4px solid #0f0';
 }
 
+// ĐÁNH DẤU ĐÃ SKIP (MỚI)
+function markAsSkipped(el) {
+  const mainComment = el.querySelector('ytcp-comment#comment');
+  if (mainComment) mainComment.classList.add('auto-skipped');
+  el.style.borderLeft = '4px solid #ffa500'; // Màu cam để phân biệt
+}
+
+// ĐÁNH DẤU LỖI
 function markAsFailed(el) {
   el.style.borderLeft = '4px solid #f00';
 }
 
 function moveToNextComment() {
-  currentCommentEl = null;  // ← THÊM DÒNG NÀY: CLEAR CURRENT COMMENT
+  currentCommentEl = null;
   window.scrollBy(0, 200);
   setTimeout(() => {
     if (isRunning) processNextComment();

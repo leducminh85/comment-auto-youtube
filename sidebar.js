@@ -1,17 +1,17 @@
 document.addEventListener('DOMContentLoaded', () => {
-  // Elements
   const apiKeyToggle = document.getElementById('apiKeyToggle');
   const apiKeyContent = document.getElementById('apiKeyContent');
   const apiKeyInput = document.getElementById('apiKey');
   const saveKeyBtn = document.getElementById('saveKey');
   const modeBtns = document.querySelectorAll('.mode-btn');
-  const startBtn = document.getElementById('start');
-  const stopBtn = document.getElementById('stop');
+  const toggleBtn = document.getElementById('toggleBtn');
   const status = document.getElementById('status');
   const preview = document.getElementById('preview');
+  const commentText = document.getElementById('commentText');
   const replyText = document.getElementById('replyText');
-  const applyBtn = document.getElementById('apply');
-  const cancelBtn = document.getElementById('cancel');
+  const regenerateBtn = document.getElementById('regenerateBtn');
+  const applyBtn = document.getElementById('applyBtn');
+  const cancelBtn = document.getElementById('cancelBtn');
   const logBox = document.getElementById('logBox');
   const clearLog = document.getElementById('clearLog');
   const customPrompt = document.getElementById('customPrompt');
@@ -24,19 +24,20 @@ document.addEventListener('DOMContentLoaded', () => {
   let isRunning = false;
   let currentMode = 'continuous';
 
-  // === 1. COLLAPSIBLE API KEY ===
+  // === COLLAPSIBLE API KEY ===
   apiKeyToggle.addEventListener('click', () => {
     const isOpen = apiKeyContent.style.display === 'block';
     apiKeyContent.style.display = isOpen ? 'none' : 'block';
     apiKeyToggle.classList.toggle('open', !isOpen);
   });
 
-  // === 2. MODE TOGGLE ===
+  // === MODE TOGGLE ===
   modeBtns.forEach(btn => {
     btn.addEventListener('click', () => {
       modeBtns.forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       currentMode = btn.dataset.mode;
+      appendLog(`Mode switched to: ${currentMode}`);
     });
   });
 
@@ -44,14 +45,8 @@ document.addEventListener('DOMContentLoaded', () => {
   chrome.storage.local.get(['apiKey', 'customPrompt'], (result) => {
     if (result.apiKey) apiKeyInput.value = result.apiKey;
     customPrompt.value = result.customPrompt || DEFAULT_PROMPT;
-    promptStatus.textContent = result.customPrompt ? 'Prompt tùy chỉnh' : 'Prompt mặc định';
+    promptStatus.textContent = result.customPrompt ? 'Tùy chỉnh' : 'Mặc định';
   });
-
-  // === LOADING STATE ===
-  function setProcessing(processing) {
-    document.body.classList.toggle('processing', processing);
-    document.body.classList.toggle('loading', processing);
-  }
 
   // === SAVE KEY ===
   saveKeyBtn.addEventListener('click', () => {
@@ -60,9 +55,14 @@ document.addEventListener('DOMContentLoaded', () => {
       setProcessing(true);
       chrome.storage.local.set({ apiKey: key }, () => {
         status.textContent = 'Đã lưu Key!';
-        setTimeout(() => status.textContent = 'Ready', 1500);
+        setTimeout(() => status.textContent = 'Ready', 2000);
         setProcessing(false);
+        apiKeyContent.style.display = 'none';
+        apiKeyToggle.classList.remove('open');
       });
+    } else {
+      status.textContent = 'Key không trống!';
+      setTimeout(() => status.textContent = 'Ready', 2000);
     }
   });
 
@@ -73,10 +73,10 @@ document.addEventListener('DOMContentLoaded', () => {
       setProcessing(true);
       chrome.storage.local.set({ customPrompt: p }, () => {
         promptStatus.textContent = 'Đã lưu!';
-        promptStatus.style.color = '#00ff00';
+        promptStatus.style.color = 'var(--success)';
         setTimeout(() => {
-          promptStatus.textContent = 'Prompt tùy chỉnh';
-          promptStatus.style.color = '#00ffff';
+          promptStatus.textContent = 'Tùy chỉnh';
+          promptStatus.style.color = 'var(--neon-cyan)';
           setProcessing(false);
         }, 1500);
       });
@@ -88,58 +88,84 @@ document.addEventListener('DOMContentLoaded', () => {
     setProcessing(true);
     customPrompt.value = DEFAULT_PROMPT;
     chrome.storage.local.remove('customPrompt', () => {
-      promptStatus.textContent = 'Đã khôi phục mặc định';
-      setTimeout(() => setProcessing(false), 800);
+      promptStatus.textContent = 'Khôi phục mặc định';
+      setTimeout(() => {
+        promptStatus.textContent = 'Mặc định';
+        setProcessing(false);
+      }, 800);
     });
   });
 
-  // === START ===
-  startBtn.addEventListener('click', () => {
+  // === TOGGLE START/STOP ===
+  toggleBtn.addEventListener('click', () => {
+    if (isRunning) {
+      stopProcessing();
+    } else {
+      startProcessing();
+    }
+  });
+
+  function startProcessing() {
     setProcessing(true);
     chrome.storage.local.get(['apiKey', 'customPrompt'], (result) => {
       if (!result.apiKey) {
         status.textContent = 'Thiếu API Key!';
+        setTimeout(() => status.textContent = 'Ready', 2000);
         setProcessing(false);
         return;
       }
-      const prompt = result.customPrompt || DEFAULT_PROMPT;
+      
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (!tabs[0]) {
+          status.textContent = 'Không có tab';
+          setProcessing(false);
+          return;
+        }
+        
         chrome.tabs.sendMessage(tabs[0].id, {
           action: 'start',
           mode: currentMode,
           apiKey: result.apiKey,
-          prompt
+          prompt: result.customPrompt || DEFAULT_PROMPT
         });
+        
         isRunning = true;
-        startBtn.disabled = true;
-        stopBtn.disabled = false;
+        toggleBtn.textContent = 'Stop';
+        toggleBtn.classList.add('stop-btn');
         status.textContent = `Running: ${currentMode}`;
-        appendLog('Started...');
+        status.style.color = 'var(--success)';
+        appendLog(`Started in ${currentMode} mode`);
         setProcessing(false);
       });
     });
-  });
+  }
 
-  // === STOP ===
-  stopBtn.addEventListener('click', () => {
+  function stopProcessing() {
     setProcessing(true);
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      chrome.tabs.sendMessage(tabs[0].id, { action: 'stop' });
+      if (tabs[0]) {
+        chrome.tabs.sendMessage(tabs[0].id, { action: 'stop' });
+      }
     });
+    
     isRunning = false;
-    startBtn.disabled = false;
-    stopBtn.disabled = true;
+    toggleBtn.textContent = 'Start';
+    toggleBtn.classList.remove('stop-btn');
     status.textContent = 'Stopped';
+    status.style.color = 'var(--warning)';
     preview.style.display = 'none';
-    appendLog('Stopped.');
+    appendLog('Stopped');
     setProcessing(false);
-  });
+  }
 
-  // === PREVIEW & LOG MESSAGES ===
+  // === PREVIEW & MESSAGES ===
   chrome.runtime.onMessage.addListener((msg) => {
     if (msg.action === 'showPreview') {
       preview.style.display = 'block';
-      replyText.textContent = msg.reply;
+      commentText.textContent = msg.comment;
+      replyText.value = msg.reply;
+      replyText.focus();
+      replyText.select();
       appendLog('Preview ready');
     }
     
@@ -147,36 +173,65 @@ document.addEventListener('DOMContentLoaded', () => {
       preview.style.display = 'none';
     }
     
+    if (msg.action === 'setLoading') {
+      status.textContent = msg.loading ? 'Loading...' : `Running: ${currentMode}`;
+    }
+    
     if (msg.action === 'log') {
       appendLog(msg.text);
     }
   });
 
-  // === APPLY BUTTON (MANUAL MODE) ===
-  applyBtn.addEventListener('click', () => {
+  // === RE-GENERATE ===
+  regenerateBtn.addEventListener('click', () => {
+    status.textContent = 'Regenerating...';
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      chrome.tabs.sendMessage(tabs[0].id, { 
-        action: 'applyReply', 
-        reply: replyText.textContent 
-      });
+      if (tabs[0]) {
+        chrome.tabs.sendMessage(tabs[0].id, { action: 'regenerate' });
+      }
+    });
+  });
+
+  // === APPLY ===
+  applyBtn.addEventListener('click', () => {
+    const editedText = replyText.value;
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs[0]) {
+        chrome.tabs.sendMessage(tabs[0].id, { 
+          action: 'applyReply', 
+          reply: editedText
+        });
+      }
     });
     preview.style.display = 'none';
   });
 
-  // === CANCEL BUTTON (CẢ HAI MODE) ===
+  // === SKIP → chuyển sang comment mới ===
   cancelBtn.addEventListener('click', () => {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      chrome.tabs.sendMessage(tabs[0].id, { action: 'nextComment' });
+      if (tabs[0]) {
+        chrome.tabs.sendMessage(tabs[0].id, { action: 'skipAndNext' });
+      }
     });
     preview.style.display = 'none';
+    appendLog('Skipped → next comment');
   });
 
-  // === LOG FUNCTION ===
+  // === LOG ===
   function appendLog(msg) {
     const t = new Date().toLocaleTimeString();
     logBox.textContent += `[${t}] ${msg}\n`;
     logBox.scrollTop = logBox.scrollHeight;
   }
 
-  clearLog.addEventListener('click', () => logBox.textContent = '');
+  // === CLEAR LOG ===
+  clearLog.addEventListener('click', () => {
+    logBox.textContent = '';
+    appendLog('Log cleared');
+  });
+
+  // === LOADING STATE ===
+  function setProcessing(processing) {
+    document.body.classList.toggle('processing', processing);
+  }
 });

@@ -5,7 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const apiKeyContent = document.getElementById('apiKeyContent');
   const apiKeyInput = document.getElementById('apiKey');
   const saveKeyBtn = document.getElementById('saveKey');
-  const modeBtns = document.querySelectorAll('.mode-btn');
+  const modeBtns = document.querySelectorAll('.mode-toggle .toggle-btn[data-mode]');
   const toggleBtn = document.getElementById('toggleBtn');
   const status = document.getElementById('status');
   const preview = document.getElementById('preview');
@@ -22,8 +22,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const promptStatus = document.getElementById('promptStatus');
   
   const contextModeBtns = document.querySelectorAll('.context-mode-btn');
-  
-  // **UPDATE**: Lấy các container UI
   const promptModeContainer = document.getElementById('promptModeContainer');
   const chatbotModeContainer = document.getElementById('chatbotModeContainer');
 
@@ -33,7 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let currentMode = 'continuous';
   let currentContextMode = 'prompt';
 
-  // === COLLAPSIBLE API KEY ===
+  // === COLLAPSIBLES ===
   apiKeyToggle.addEventListener('click', () => {
     const isOpen = apiKeyContent.style.display === 'block';
     apiKeyContent.style.display = isOpen ? 'none' : 'block';
@@ -50,18 +48,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // **UPDATE**: Hàm cập nhật giao diện ngữ cảnh
+  // === CONTEXT UI SWITCHER ===
   function updateContextUI(mode) {
-    if (mode === 'prompt') {
-      promptModeContainer.style.display = 'block';
-      chatbotModeContainer.style.display = 'none';
-    } else { // 'chatbot'
-      promptModeContainer.style.display = 'none';
-      chatbotModeContainer.style.display = 'block';
-    }
+    promptModeContainer.style.display = (mode === 'prompt') ? 'block' : 'none';
+    chatbotModeContainer.style.display = (mode === 'chatbot') ? 'block' : 'none';
   }
 
-  // === CONTEXT MODE TOGGLE ===
   contextModeBtns.forEach(btn => {
     btn.addEventListener('click', () => {
       contextModeBtns.forEach(b => b.classList.remove('active'));
@@ -69,7 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
       currentContextMode = btn.dataset.contextMode;
       chrome.storage.local.set({ contextMode: currentContextMode });
       appendLog(`Context source switched to: ${currentContextMode}`);
-      updateContextUI(currentContextMode); // **UPDATE**: Gọi hàm cập nhật UI
+      updateContextUI(currentContextMode);
     });
   });
 
@@ -77,30 +69,32 @@ document.addEventListener('DOMContentLoaded', () => {
   chrome.storage.local.get(['apiKey', 'customPrompt', 'contextMode'], (result) => {
     if (result.apiKey) apiKeyInput.value = result.apiKey;
     customPrompt.value = result.customPrompt || DEFAULT_PROMPT;
-    promptStatus.textContent = result.customPrompt ? 'Tùy chỉnh' : 'Mặc định';
+    promptStatus.textContent = result.customPrompt ? 'Status: Custom' : 'Status: Default';
 
     currentContextMode = result.contextMode || 'prompt';
     contextModeBtns.forEach(btn => {
         btn.classList.toggle('active', btn.dataset.contextMode === currentContextMode);
     });
-    updateContextUI(currentContextMode); // **UPDATE**: Gọi hàm để đặt UI đúng trạng thái lúc khởi động
+    updateContextUI(currentContextMode);
   });
 
   // === SAVE KEY ===
   saveKeyBtn.addEventListener('click', () => {
     const key = apiKeyInput.value.trim();
     if (key) {
-      setProcessing(true);
       chrome.storage.local.set({ apiKey: key }, () => {
-        status.textContent = 'Đã lưu Key!';
+        status.textContent = 'API Key Saved!';
         setTimeout(() => status.textContent = 'Ready', 2000);
-        setProcessing(false);
         apiKeyContent.style.display = 'none';
         apiKeyToggle.classList.remove('open');
       });
     } else {
-      status.textContent = 'Key không trống!';
-      setTimeout(() => status.textContent = 'Ready', 2000);
+      status.textContent = 'API Key cannot be empty!';
+      status.style.color = 'var(--danger)';
+      setTimeout(() => {
+        status.textContent = 'Ready';
+        status.style.color = 'var(--success)';
+      }, 2000);
     }
   });
 
@@ -108,14 +102,12 @@ document.addEventListener('DOMContentLoaded', () => {
   savePromptBtn.addEventListener('click', () => {
     const p = customPrompt.value.trim();
     if (p) {
-      setProcessing(true);
       chrome.storage.local.set({ customPrompt: p }, () => {
-        promptStatus.textContent = 'Đã lưu!';
+        promptStatus.textContent = 'Saved!';
         promptStatus.style.color = 'var(--success)';
         setTimeout(() => {
-          promptStatus.textContent = 'Tùy chỉnh';
-          promptStatus.style.color = 'var(--neon-cyan)';
-          setProcessing(false);
+          promptStatus.textContent = 'Status: Custom';
+          promptStatus.style.color = 'var(--text-muted)';
         }, 1500);
       });
     }
@@ -123,77 +115,65 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // === RESET PROMPT ===
   resetPromptBtn.addEventListener('click', () => {
-    setProcessing(true);
     customPrompt.value = DEFAULT_PROMPT;
     chrome.storage.local.remove('customPrompt', () => {
-      promptStatus.textContent = 'Khôi phục mặc định';
+      promptStatus.textContent = 'Restored to default!';
       setTimeout(() => {
-        promptStatus.textContent = 'Mặc định';
-        setProcessing(false);
-      }, 800);
+        promptStatus.textContent = 'Status: Default';
+      }, 1500);
     });
   });
 
   // === TOGGLE START/STOP ===
   toggleBtn.addEventListener('click', () => {
-    if (isRunning) {
-      stopProcessing();
-    } else {
-      startProcessing();
-    }
+    if (isRunning) stopProcessing();
+    else startProcessing();
   });
 
   function startProcessing() {
-    setProcessing(true);
-    chrome.storage.local.get(['apiKey', 'customPrompt'], (result) => {
+    chrome.storage.local.get(['apiKey'], (result) => {
       if (!result.apiKey) {
-        status.textContent = 'Thiếu API Key!';
-        setTimeout(() => status.textContent = 'Ready', 2000);
-        setProcessing(false);
+        status.textContent = 'API Key is missing!';
+        status.style.color = 'var(--danger)';
+        setTimeout(() => {
+            status.textContent = 'Ready';
+            status.style.color = 'var(--success)';
+        }, 2000);
         return;
       }
       
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         if (!tabs[0]) {
-          status.textContent = 'Không có tab';
-          setProcessing(false);
+          status.textContent = 'No active tab found';
           return;
         }
         
-        chrome.tabs.sendMessage(tabs[0].id, {
-          action: 'start',
-          mode: currentMode,
-          apiKey: result.apiKey,
-          prompt: result.customPrompt || DEFAULT_PROMPT
-        });
+        chrome.tabs.sendMessage(tabs[0].id, { action: 'start', mode: currentMode, apiKey: result.apiKey });
         
         isRunning = true;
         toggleBtn.textContent = 'Stop';
-        toggleBtn.classList.add('stop-btn');
+        toggleBtn.classList.remove('btn-primary');
+        toggleBtn.classList.add('btn-danger'); // **UPDATE**: Use danger class
         status.textContent = `Running: ${currentMode}`;
         status.style.color = 'var(--success)';
         appendLog(`Started in ${currentMode} mode`);
-        setProcessing(false);
       });
     });
   }
 
   function stopProcessing() {
-    setProcessing(true);
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs[0]) {
-        chrome.tabs.sendMessage(tabs[0].id, { action: 'stop' });
-      }
+      if (tabs[0]) chrome.tabs.sendMessage(tabs[0].id, { action: 'stop' });
     });
     
     isRunning = false;
     toggleBtn.textContent = 'Start';
-    toggleBtn.classList.remove('stop-btn');
+    toggleBtn.classList.remove('btn-danger'); // **UPDATE**: Remove danger class
+    toggleBtn.classList.add('btn-primary');
     status.textContent = 'Stopped';
-    status.style.color = 'var(--warning)';
+    status.style.color = 'var(--danger)';
     preview.style.display = 'none';
     appendLog('Stopped');
-    setProcessing(false);
   }
 
   // === PREVIEW & MESSAGES ===
@@ -205,51 +185,33 @@ document.addEventListener('DOMContentLoaded', () => {
       replyText.focus();
       replyText.select();
       appendLog('Preview ready');
-    }
-    
-    if (msg.action === 'hidePreview') {
+    } else if (msg.action === 'hidePreview') {
       preview.style.display = 'none';
-    }
-    
-    if (msg.action === 'setLoading') {
+    } else if (msg.action === 'setLoading') {
       status.textContent = msg.loading ? 'Loading...' : `Running: ${currentMode}`;
-    }
-    
-    if (msg.action === 'log') {
+    } else if (msg.action === 'log') {
       appendLog(msg.text);
     }
   });
 
-  // === RE-GENERATE ===
+  // === PREVIEW BUTTONS ===
   regenerateBtn.addEventListener('click', () => {
     status.textContent = 'Regenerating...';
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs[0]) {
-        chrome.tabs.sendMessage(tabs[0].id, { action: 'regenerate' });
-      }
+      if (tabs[0]) chrome.tabs.sendMessage(tabs[0].id, { action: 'regenerate' });
     });
   });
 
-  // === APPLY ===
   applyBtn.addEventListener('click', () => {
-    const editedText = replyText.value;
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs[0]) {
-        chrome.tabs.sendMessage(tabs[0].id, { 
-          action: 'applyReply', 
-          reply: editedText
-        });
-      }
+      if (tabs[0]) chrome.tabs.sendMessage(tabs[0].id, { action: 'applyReply', reply: replyText.value });
     });
     preview.style.display = 'none';
   });
 
-  // === SKIP → chuyển sang comment mới ===
   cancelBtn.addEventListener('click', () => {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs[0]) {
-        chrome.tabs.sendMessage(tabs[0].id, { action: 'skipAndNext' });
-      }
+      if (tabs[0]) chrome.tabs.sendMessage(tabs[0].id, { action: 'skipAndNext' });
     });
     preview.style.display = 'none';
     appendLog('Skipped → next comment');
@@ -262,16 +224,10 @@ document.addEventListener('DOMContentLoaded', () => {
     logBox.scrollTop = logBox.scrollHeight;
   }
 
-  // === CLEAR LOG ===
   clearLog.addEventListener('click', () => {
     logBox.textContent = '';
     appendLog('Log cleared');
   });
-
-  // === LOADING STATE ===
-  function setProcessing(processing) {
-    document.body.classList.toggle('processing', processing);
-  }
 
   // === CHATBOT AI ===
   const chatbotToggle = document.getElementById('chatbotToggle');
@@ -280,10 +236,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const chatInput = document.getElementById('chatInput');
   const sendChat = document.getElementById('sendChat');
   const clearChatBtn = document.getElementById('clearChat');
-
   let chatHistory = [];
 
-  // Load chat history
   chrome.storage.local.get(['chatHistory'], (result) => {
     if (result.chatHistory) {
       chatHistory = result.chatHistory;
@@ -291,7 +245,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Toggle chatbot
   chatbotToggle.addEventListener('click', () => {
     const isOpen = chatbotContent.style.display === 'block';
     chatbotContent.style.display = isOpen ? 'none' : 'block';
@@ -299,80 +252,65 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!isOpen) chatInput.focus();
   });
 
-  // Send message
-  sendChat.addEventListener('click', sendChatMessage);
-  chatInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') sendChatMessage();
-  });
-
-  async function sendChatMessage() {
+  const sendChatMessage = async () => {
     const userText = chatInput.value.trim();
     if (!userText) return;
 
-    // Add user message
     chatHistory.push({ role: 'user', parts: [{ text: userText }] });
     renderChat();
     chatInput.value = '';
-    appendLog('Chat: ' + userText);
+    appendLog('Chat (User): ' + userText);
 
-    setProcessing(true);
-    status.textContent = 'AI đang suy nghĩ...';
+    status.textContent = 'AI is thinking...';
 
     try {
-      const result = await chrome.storage.local.get(['apiKey']);
-      const apiKey = result.apiKey;
-      if (!apiKey) throw new Error('Thiếu API Key');
+      const { apiKey } = await chrome.storage.local.get(['apiKey']);
+      if (!apiKey) throw new Error('API Key is missing');
 
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contents: chatHistory })
       });
-
       const data = await response.json();
+
       if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
         const aiText = data.candidates[0].content.parts[0].text.trim();
         chatHistory.push({ role: 'model', parts: [{ text: aiText }] });
         renderChat();
-        appendLog('AI: ' + aiText.substring(0, 50) + '...');
+        appendLog('Chat (AI): ' + aiText.substring(0, 40) + '...');
       } else {
-        throw new Error(data.error?.message || 'Không có phản hồi');
+        throw new Error(data.error?.message || 'No valid response from AI');
       }
     } catch (err) {
       appendLog('Chat error: ' + err.message);
-      chatMessages.innerHTML += `<div style="color:#f66; font-style:italic;">Lỗi: ${err.message}</div>`;
+      chatMessages.innerHTML += `<div class="chat-message" style="color:var(--danger);">${err.message}</div>`;
     } finally {
-      setProcessing(false);
       status.textContent = isRunning ? `Running: ${currentMode}` : 'Ready';
       saveChatHistory();
     }
-  }
+  };
 
-  // Render chat
+  sendChat.addEventListener('click', sendChatMessage);
+  chatInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage(); }
+  });
+
   function renderChat() {
     chatMessages.innerHTML = '';
     chatHistory.forEach(msg => {
       const div = document.createElement('div');
-      div.style.margin = '6px 0';
-      div.style.padding = '6px 8px';
-      div.style.borderRadius = '6px';
-      div.style.maxWidth = '90%';
-      div.style.alignSelf = msg.role === 'user' ? 'flex-end' : 'flex-start';
-      div.style.background = msg.role === 'user' ? 'var(--neon-purple)' : '#333';
-      div.style.color = msg.role === 'user' ? '#000' : 'var(--text)';
-      div.style.fontSize = '11px';
+      div.classList.add('chat-message', msg.role === 'user' ? 'user' : 'model');
       div.textContent = msg.parts[0].text;
       chatMessages.appendChild(div);
     });
     chatMessages.scrollTop = chatMessages.scrollHeight;
   }
 
-  // Save chat history
   function saveChatHistory() {
     chrome.storage.local.set({ chatHistory });
   }
 
-  // Clear chat
   clearChatBtn.addEventListener('click', () => {
     chatHistory = [];
     renderChat();

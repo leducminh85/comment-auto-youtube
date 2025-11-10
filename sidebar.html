@@ -8,438 +8,322 @@
     :root {
       --neon-cyan: #00ffff;
       --neon-purple: #bb86fc;
-      --bg-dark: #0a0a0a;
-      --card-bg: #1e1e1e;
+      --bg-dark: #1e1e1e;
+      --card-bg: #2c2c2c;
       --text: #e0e0e0;
-      --disabled: #555;
-      --success: #00cc00;
-      --danger: #ff3333;
-      --warning: #ffaa00;
+      --text-muted: #999;
+      --success: #00ff7f;
+      --danger: #ff4d4d;
+      --border-color: rgba(187, 134, 252, 0.25);
+      --border-color-hover: rgba(0, 255, 255, 0.7);
     }
     
-    * { box-sizing: border-box; }
-    body {
-      width: 320px;
-      padding: 15px;
-      font-family: 'Roboto', sans-serif;
-      background: linear-gradient(135deg, var(--bg-dark), #1a1a1a);
-      color: var(--text);
+    * { 
+      box-sizing: border-box;
       margin: 0;
+      padding: 0;
+    }
+
+    /* === SCROLLBAR STYLES === */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb {
+      background-color: #555;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover { background-color: #777; }
+
+    body {
+      width: 330px;
+      padding: 16px;
+      font-family: 'Roboto', sans-serif;
+      background: var(--bg-dark);
+      color: var(--text);
     }
     
     h3 {
       color: var(--neon-cyan);
-      text-shadow: 0 0 8px rgba(0, 255, 255, 0.6);
-      margin: 0 0 15px;
-      font-size: 18px;
+      text-shadow: 0 0 8px rgba(0, 255, 255, 0.7);
+      margin-bottom: 24px;
+      font-size: 22px;
       text-align: center;
+      font-weight: 700;
+    }
+
+    .section {
+      margin-bottom: 24px;
     }
 
     .section-label {
-      font-size: 12px;
+      font-size: 14px;
       color: var(--neon-cyan);
-      margin-bottom: 5px;
-      margin-top: 15px;
+      margin-bottom: 8px;
       font-weight: 500;
     }
 
+    /* === COLLAPSIBLES === */
     .collapsible {
       cursor: pointer;
-      padding: 10px;
+      padding: 12px 16px;
       background: var(--card-bg);
       border-radius: 8px;
-      margin-bottom: 10px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      transition: 0.3s;
-      box-shadow: 0 0 5px rgba(0, 255, 255, 0.2);
+      transition: all 0.2s ease;
+      border: 1px solid var(--border-color);
     }
-    .collapsible:hover { 
-      box-shadow: 0 0 10px rgba(0, 255, 255, 0.5); 
-      background: #252525;
-    }
+    .collapsible:hover { border-color: var(--border-color-hover); }
     .collapsible .arrow {
       transition: transform 0.3s;
       color: var(--neon-cyan);
+      font-size: 20px;
+      line-height: 1;
     }
-    .collapsible.open .arrow { 
-      transform: rotate(90deg); 
-    }
+    .collapsible.open .arrow { transform: rotate(90deg); }
     
     .collapse-content {
       display: none;
-      padding: 10px;
-      background: #2c2c2c;
-      border-radius: 8px;
-      margin-top: 8px;
-      border: 1px solid var(--neon-cyan);
-      animation: slideDown 0.3s ease;
+      padding: 16px;
+      background: #252525;
+      border-radius: 0 0 8px 8px;
+      margin-top: -1px;
+      border: 1px solid var(--border-color-hover);
+      border-top: none;
+      animation: fadeIn 0.4s ease;
     }
-    @keyframes slideDown {
-      from { opacity: 0; transform: translateY(-10px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    
-    .collapse-content input {
-      background: #333;
-      border: 1px solid var(--neon-purple);
-      color: var(--text);
-      padding: 8px;
-      border-radius: 6px;
-      width: 100%;
-      margin-bottom: 8px;
-      font-size: 12px;
-    }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-    .mode-toggle {
-      display: flex;
-      background: #2c2c2c;
-      border-radius: 8px;
-      overflow: hidden;
-      margin: 5px 0 12px 0;
-      border: 1px solid var(--neon-cyan);
-    }
-    .mode-btn, .context-mode-btn {
-      flex: 1;
-      padding: 10px;
-      text-align: center;
-      font-weight: 500;
-      cursor: pointer;
-      transition: 0.3s;
-      font-size: 12px;
-    }
-    .mode-btn.active, .context-mode-btn.active {
-      background: linear-gradient(135deg, var(--neon-cyan), var(--neon-purple));
-      color: #000;
-      font-weight: 700;
-      box-shadow: 0 0 10px rgba(0, 255, 255, 0.7);
-    }
-
-    button {
+    /* === BUTTONS === */
+    .btn {
       width: 100%;
       padding: 12px;
-      margin: 8px 0;
       border: none;
       border-radius: 8px;
       font-weight: 700;
       cursor: pointer;
-      transition: all 0.3s;
+      transition: all 0.2s ease;
+      font-size: 14px;
+      text-align: center;
+    }
+    .btn-primary {
       background: linear-gradient(135deg, var(--neon-cyan), var(--neon-purple));
       color: #000;
-      font-size: 14px;
-      position: relative;
+    }
+    .btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 15px rgba(0, 255, 255, 0.3);
+    }
+    .btn-danger {
+      background: linear-gradient(135deg, #ff6b6b, var(--danger));
+      color: #fff;
+    }
+    .btn-danger:hover:not(:disabled) {
+       box-shadow: 0 4px 15px rgba(255, 77, 77, 0.4);
+    }
+    .btn-secondary {
+      background: #3e3e3e;
+      color: var(--text-muted);
+    }
+    .btn-secondary:hover:not(:disabled) {
+      background: #4f4f4f;
+      color: var(--text);
+      box-shadow: none;
+    }
+    .btn-group {
+      display: flex;
+      gap: 8px;
+    }
+    
+    /* === TOGGLES === */
+    .mode-toggle {
+      display: flex;
+      background: var(--card-bg);
+      border-radius: 8px;
       overflow: hidden;
+      border: 1px solid var(--border-color);
+      padding: 2px;
+    }
+    .mode-toggle .toggle-btn {
+      flex: 1;
+      padding: 8px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-size: 13px;
+      text-align: center;
+      color: var(--text-muted);
+      border-radius: 6px;
+    }
+    .mode-toggle .toggle-btn.active {
+      background: linear-gradient(135deg, var(--neon-cyan), var(--neon-purple));
+      color: #000;
+      font-weight: 700;
     }
     
-    button:hover:not(:disabled) {
-      transform: scale(1.05);
-      box-shadow: 0 0 15px rgba(0, 255, 255, 0.8);
+    /* === INPUTS & TEXTAREAS === */
+    .input-field, textarea {
+      width: 100%;
+      background: #333;
+      border: 1px solid #444;
+      color: var(--text);
+      padding: 10px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-family: 'Roboto', sans-serif;
+      transition: all 0.2s ease;
     }
-    
-    button:active:not(:disabled) {
-      transform: scale(0.98);
+    .input-field:focus, textarea:focus {
+      outline: none;
+      border-color: var(--border-color-hover);
+      box-shadow: 0 0 8px rgba(0, 255, 255, 0.2);
     }
-    
-    button.stop-btn {
-      background: linear-gradient(135deg, #ff6b6b, #ff0000);
-    }
-    
-    button.stop-btn:hover:not(:disabled) {
-      box-shadow: 0 0 15px rgba(255, 0, 0, 0.8);
-    }
+    textarea { resize: vertical; min-height: 80px; }
 
+    /* === STATUS & LOG === */
     #status {
       text-align: center;
       font-weight: 500;
-      color: #00ff00;
-      margin: 10px 0;
-      height: 30px;
+      color: var(--success);
+      margin: 12px 0;
+      height: 20px;
       font-size: 14px;
     }
-
-    .preview {
-      background: linear-gradient(135deg, #1a1a2e, #16213e);
-      padding: 12px;
-      border-radius: 10px;
-      border: 2px solid var(--neon-purple);
-      box-shadow: 0 0 15px rgba(187, 134, 252, 0.6);
-      margin: 12px 0;
-      display: none;
-      animation: slideIn 0.4s ease;
-    }
-    
-    @keyframes slideIn {
-      from { opacity: 0; transform: translateY(-20px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    
-    .preview strong {
-      color: var(--neon-cyan);
-      display: block;
-      margin-bottom: 6px;
-      font-size: 12px;
-    }
-    
-    #commentText {
-      background: #0f0f1e;
-      padding: 8px;
-      border-radius: 6px;
-      margin-bottom: 10px;
-      color: #aaa;
-      font-size: 11px;
-      max-height: 50px;
-      overflow-y: auto;
-      border-left: 3px solid var(--neon-cyan);
-      line-height: 1.4;
-    }
-    
-    #replyText {
-      color: #fff;
-      font-weight: 500;
-      background: #0f0f1e;
-      padding: 10px;
-      border-radius: 6px;
-      margin-bottom: 10px;
-      min-height: 60px;
-      font-size: 12px;
-      line-height: 1.5;
-      border: 1px solid var(--neon-purple);
-      width: 100%;
-      font-family: 'Roboto', sans-serif;
-      resize: vertical;
-    }
-    
-    #replyText:focus {
-      outline: none;
-      border-color: var(--neon-cyan);
-      box-shadow: 0 0 8px rgba(0, 255, 255, 0.3);
-    }
-    
-    .preview-buttons {
-      display: flex;
-      gap: 5px;
-      flex-wrap: wrap;
-      justify-content: space-between;
-    }
-    
-    .preview-buttons button {
-      flex: 1;
-      min-width: 45%;
-      margin: 3px 0;
-      padding: 8px;
-      font-size: 12px;
-    }
-
-    #logContainer {
-      margin-top: 15px;
-    }
-    
-    #logContainer > strong {
-      display: block;
-      margin-bottom: 8px;
-      color: var(--neon-cyan);
-      font-size: 12px;
-    }
-    
     #logBox {
       height: 120px;
       overflow-y: auto;
-      background: #0a0a0a;
-      color: #00ff00;
+      background: #111;
+      color: var(--success);
       padding: 10px;
       border-radius: 8px;
-      font-family: monospace;
-      font-size: 11px;
-      border: 1px solid var(--neon-cyan);
-      white-space: pre-wrap;
-      word-break: break-word;
-    }
-    
-    #logBox::-webkit-scrollbar {
-      width: 6px;
-    }
-    #logBox::-webkit-scrollbar-track {
-      background: #1a1a1a;
-    }
-    #logBox::-webkit-scrollbar-thumb {
-      background: var(--neon-cyan);
-      border-radius: 3px;
-    }
-
-    .prompt-editor {
-      margin-top: 15px;
-      padding: 10px;
-      background: var(--card-bg);
-      border-radius: 8px;
-      border: 1px solid var(--neon-cyan);
-    }
-    
-    .prompt-editor label {
-      display: block;
+      font-family: 'Menlo', 'Monaco', monospace;
+      font-size: 12px;
+      border: 1px solid var(--border-color);
       margin-bottom: 8px;
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--neon-cyan);
     }
     
-    .prompt-editor textarea {
-      width: 100%;
-      height: 80px;
-      background: #2c2c2c;
+    /* === PREVIEW CARD === */
+    #preview {
+      display: none;
+      background: var(--card-bg);
+      padding: 16px;
+      border-radius: 10px;
       border: 1px solid var(--neon-purple);
-      color: var(--text);
-      padding: 8px;
+      animation: fadeIn 0.4s ease;
+    }
+    #commentText {
+      background: #3e3e3e;
+      padding: 10px;
       border-radius: 6px;
-      resize: vertical;
-      font-size: 11px;
-      font-family: 'Roboto', sans-serif;
+      margin-bottom: 12px;
+      color: var(--text-muted);
+      font-size: 13px;
+      max-height: 60px;
+      overflow-y: auto;
+      border-left: 3px solid var(--neon-cyan);
     }
     
-    .prompt-editor textarea:focus {
-      outline: none;
-      border-color: var(--neon-cyan);
-      box-shadow: 0 0 8px rgba(0, 255, 255, 0.3);
-    }
-    
-    .prompt-buttons {
-      display: flex;
-      gap: 5px;
-      margin-top: 8px;
-    }
-    
-    .prompt-buttons button {
-      flex: 1;
+    /* === CHATBOT UI === */
+    #chatMessages {
+      height: 250px;
+      overflow-y: auto;
+      background: #111;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
       padding: 8px;
-      font-size: 12px;
-      margin: 0;
+      margin-bottom: 12px;
+      display: flex; flex-direction: column; gap: 8px;
     }
-    
-    #promptStatus {
-      color: var(--neon-cyan);
-      margin-top: 5px;
-      display: block;
-      font-size: 11px;
+    .chat-message {
+      padding: 8px 12px; border-radius: 12px; max-width: 85%;
+      font-size: 13px; line-height: 1.4; word-wrap: break-word;
     }
-
-    .processing * {
-      pointer-events: none !important;
-      opacity: 0.6;
+    .chat-message.user {
+      align-self: flex-end; background: var(--neon-purple); color: #000;
+      border-bottom-right-radius: 4px;
     }
-    .processing .preview,
-    .processing #status,
-    .processing #toggleBtn,
-    .processing #applyBtn,
-    .processing #cancelBtn,
-    .processing #regenerateBtn {
-      pointer-events: auto !important;
-      opacity: 1;
+    .chat-message.model {
+      align-self: flex-start; background: #333; color: var(--text);
+      border-bottom-left-radius: 4px;
     }
+    #chatInputContainer { display: flex; gap: 8px; margin-bottom: 8px; }
+    #chatInput { flex: 1; min-width: 0; }
+    #sendChat { flex-shrink: 0; width: auto; padding: 0 20px; }
   </style>
 </head>
 <body>
 
   <h3>Auto Reply Gemini</h3>
 
-  <div class="collapsible" id="apiKeyToggle">
-    <span>API Key (Gemini)</span>
-    <span class="arrow">›</span>
-  </div>
-  <div class="collapse-content" id="apiKeyContent">
-    <input type="password" id="apiKey" placeholder="Nhập API Key...">
-    <button id="saveKey">Lưu Key</button>
-  </div>
-
-  <div class="section-label">Chế độ chạy:</div>
-  <div class="mode-toggle">
-    <div class="mode-btn active" data-mode="continuous">Liên tục</div>
-    <div class="mode-btn" data-mode="manual">Thủ công</div>
+  <div class="section">
+    <div class="collapsible" id="apiKeyToggle">
+      <span>API Key (Gemini)</span><span class="arrow">›</span>
+    </div>
+    <div class="collapse-content" id="apiKeyContent">
+      <input type="password" id="apiKey" placeholder="Enter your API Key..." class="input-field" style="margin-bottom: 12px;">
+      <button id="saveKey" class="btn btn-primary">Save Key</button>
+    </div>
   </div>
 
-  <button id="toggleBtn">Start</button>
+  <div class="section">
+    <div class="section-label">Run Mode:</div>
+    <div class="mode-toggle">
+      <div class="toggle-btn active" data-mode="continuous">Continuous</div>
+      <div class="toggle-btn" data-mode="manual">Manual</div>
+    </div>
+  </div>
+
+  <button id="toggleBtn" class="btn btn-primary">Start</button>
   <div id="status">Ready</div>
 
-  <div id="preview" class="preview">
-    <strong>Comment:</strong>
+  <div id="preview" class="section">
+    <strong class="section-label">Comment:</strong>
     <div id="commentText"></div>
-    <strong>Reply:</strong>
-    <textarea id="replyText" placeholder="..."></textarea>
-    <div class="preview-buttons">
-      <button id="regenerateBtn">Tạo lại</button>
-      <button id="applyBtn">Trả lời</button>
-      <button id="cancelBtn">Bỏ qua</button>
+    <strong class="section-label" style="margin-top:12px;">Reply:</strong>
+    <textarea id="replyText" placeholder="AI-generated reply will appear here..."></textarea>
+    <div class="btn-group" style="margin-top: 12px;">
+      <button id="regenerateBtn" class="btn btn-secondary">Regenerate</button>
+      <button id="cancelBtn" class="btn btn-secondary">Skip</button>
+      <button id="applyBtn" class="btn btn-primary">Reply</button>
     </div>
   </div>
 
-  <div id="logContainer">
-    <strong>Log:</strong>
-    <div id="logBox"></div>
-    <button id="clearLog">Clear</button>
-  </div>
-  
-  <div class="section-label">Nguồn ngữ cảnh cho AI:</div>
-  <div class="mode-toggle">
-    <div class="context-mode-btn active" data-context-mode="prompt">Prompt Cố Định</div>
-    <div class="context-mode-btn" data-context-mode="chatbot">Lịch Sử Chat</div>
-  </div>
-
-  <!-- **UPDATE**: Bọc UI của từng chế độ vào container riêng -->
-  <div id="promptModeContainer">
-    <div class="prompt-editor">
-      <label>Prompt Cố Định:</label>
-      <textarea id="customPrompt" placeholder="Nhập prompt..."></textarea>
-      <div class="prompt-buttons">
-        <button id="savePrompt">Lưu</button>
-        <button id="resetPrompt">Mặc định</button>
-      </div>
-      <small id="promptStatus"></small>
+  <div class="section">
+    <div class="section-label">AI Context Source:</div>
+    <div class="mode-toggle">
+      <div class="toggle-btn context-mode-btn active" data-context-mode="prompt">Fixed Prompt</div>
+      <div class="toggle-btn context-mode-btn" data-context-mode="chatbot">Chat History</div>
     </div>
   </div>
 
-  <!-- **UPDATE**: Container cho Chatbot, mặc định ẩn -->
-  <div id="chatbotModeContainer" style="display: none;">
+  <div id="promptModeContainer" class="section">
+    <label for="customPrompt" class="section-label">Fixed Prompt:</label>
+    <textarea id="customPrompt" placeholder="Enter a custom prompt..."></textarea>
+    <div id="promptStatus" style="font-size: 12px; color: var(--text-muted); margin: 8px 0;"></div>
+    <div class="btn-group">
+      <button id="resetPrompt" class="btn btn-secondary">Default</button>
+      <button id="savePrompt" class="btn btn-primary">Save</button>
+    </div>
+  </div>
+
+  <div id="chatbotModeContainer" class="section" style="display: none;">
     <div class="collapsible" id="chatbotToggle">
-      <span>🤖 Chatbot AI (dùng làm ngữ cảnh)</span>
-      <span class="arrow">›</span>
+      <span>🤖 Chatbot AI (Context)</span><span class="arrow">›</span>
     </div>
     <div class="collapse-content" id="chatbotContent">
-      <div id="chatMessages" style="
-        height: 200px;
-        overflow-y: auto;
-        background: #0a0a0a;
-        border: 1px solid var(--neon-cyan);
-        border-radius: 6px;
-        padding: 8px;
-        margin-bottom: 8px;
-        font-size: 11px;
-        line-height: 1.4;
-        display: flex;
-        flex-direction: column;
-      "></div>
-      <div style="display: flex; gap: 5px;">
-        <input type="text" id="chatInput" placeholder="Hỏi AI..." style="
-          flex: 1;
-          background: #333;
-          border: 1px solid var(--neon-purple);
-          color: var(--text);
-          padding: 8px;
-          border-radius: 6px;
-          font-size: 11px;
-          min-width: 50px;
-        ">
-        <button id="sendChat" style="
-          padding: 8px 10px;
-          font-size: 11px;
-          min-width: 50px;
-        ">Gửi</button>
+      <div id="chatMessages"></div>
+      <div id="chatInputContainer">
+        <input type="text" id="chatInput" placeholder="Ask AI..." class="input-field">
+        <button id="sendChat" class="btn btn-primary">Send</button>
       </div>
-      <button id="clearChat" style="
-        margin-top: 5px;
-        padding: 6px;
-        font-size: 10px;
-        background: #444;
-      ">Xóa lịch sử</button>
+      <button id="clearChat" class="btn btn-secondary">Clear History</button>
     </div>
+  </div>
+  
+  <div class="section">
+    <div class="section-label">Log:</div>
+    <div id="logBox"></div>
+    <button id="clearLog" class="btn btn-secondary">Clear</button>
   </div>
 
   <script src="sidebar.js"></script>

@@ -100,7 +100,7 @@
       margin: 5px 0 12px 0;
       border: 1px solid var(--neon-cyan);
     }
-    .mode-btn, .context-mode-btn { /* **UPDATE**: Áp dụng style chung */
+    .mode-btn, .context-mode-btn {
       flex: 1;
       padding: 10px;
       text-align: center;
@@ -109,7 +109,7 @@
       transition: 0.3s;
       font-size: 12px;
     }
-    .mode-btn.active, .context-mode-btn.active { /* **UPDATE**: Áp dụng style chung */
+    .mode-btn.active, .context-mode-btn.active {
       background: linear-gradient(135deg, var(--neon-cyan), var(--neon-purple));
       color: #000;
       font-weight: 700;
@@ -377,65 +377,69 @@
     <button id="clearLog">Clear</button>
   </div>
   
-  <!-- **UPDATE**: Thêm phần chọn nguồn ngữ cảnh -->
   <div class="section-label">Nguồn ngữ cảnh cho AI:</div>
   <div class="mode-toggle">
     <div class="context-mode-btn active" data-context-mode="prompt">Prompt Cố Định</div>
     <div class="context-mode-btn" data-context-mode="chatbot">Lịch Sử Chat</div>
   </div>
 
-
-  <div class="prompt-editor">
-    <label>Prompt Cố Định (dùng khi chọn ở trên):</label>
-    <textarea id="customPrompt" placeholder="Nhập prompt..."></textarea>
-    <div class="prompt-buttons">
-      <button id="savePrompt">Lưu</button>
-      <button id="resetPrompt">Mặc định</button>
+  <!-- **UPDATE**: Bọc UI của từng chế độ vào container riêng -->
+  <div id="promptModeContainer">
+    <div class="prompt-editor">
+      <label>Prompt Cố Định:</label>
+      <textarea id="customPrompt" placeholder="Nhập prompt..."></textarea>
+      <div class="prompt-buttons">
+        <button id="savePrompt">Lưu</button>
+        <button id="resetPrompt">Mặc định</button>
+      </div>
+      <small id="promptStatus"></small>
     </div>
-    <small id="promptStatus"></small>
   </div>
 
-  <div class="collapsible" id="chatbotToggle">
-    <span>🤖 Chatbot AI (dùng làm ngữ cảnh)</span>
-    <span class="arrow">›</span>
-  </div>
-  <div class="collapse-content" id="chatbotContent">
-    <div id="chatMessages" style="
-      height: 200px;
-      overflow-y: auto;
-      background: #0a0a0a;
-      border: 1px solid var(--neon-cyan);
-      border-radius: 6px;
-      padding: 8px;
-      margin-bottom: 8px;
-      font-size: 11px;
-      line-height: 1.4;
-      display: flex;
-      flex-direction: column;
-    "></div>
-    <div style="display: flex; gap: 5px;">
-      <input type="text" id="chatInput" placeholder="Hỏi AI..." style="
-        flex: 1;
-        background: #333;
-        border: 1px solid var(--neon-purple);
-        color: var(--text);
-        padding: 8px;
+  <!-- **UPDATE**: Container cho Chatbot, mặc định ẩn -->
+  <div id="chatbotModeContainer" style="display: none;">
+    <div class="collapsible" id="chatbotToggle">
+      <span>🤖 Chatbot AI (dùng làm ngữ cảnh)</span>
+      <span class="arrow">›</span>
+    </div>
+    <div class="collapse-content" id="chatbotContent">
+      <div id="chatMessages" style="
+        height: 200px;
+        overflow-y: auto;
+        background: #0a0a0a;
+        border: 1px solid var(--neon-cyan);
         border-radius: 6px;
+        padding: 8px;
+        margin-bottom: 8px;
         font-size: 11px;
-        min-width: 50px;
-      ">
-      <button id="sendChat" style="
-        padding: 8px 10px;
-        font-size: 11px;
-        min-width: 50px;
-      ">Gửi</button>
+        line-height: 1.4;
+        display: flex;
+        flex-direction: column;
+      "></div>
+      <div style="display: flex; gap: 5px;">
+        <input type="text" id="chatInput" placeholder="Hỏi AI..." style="
+          flex: 1;
+          background: #333;
+          border: 1px solid var(--neon-purple);
+          color: var(--text);
+          padding: 8px;
+          border-radius: 6px;
+          font-size: 11px;
+          min-width: 50px;
+        ">
+        <button id="sendChat" style="
+          padding: 8px 10px;
+          font-size: 11px;
+          min-width: 50px;
+        ">Gửi</button>
+      </div>
+      <button id="clearChat" style="
+        margin-top: 5px;
+        padding: 6px;
+        font-size: 10px;
+        background: #444;
+      ">Xóa lịch sử</button>
     </div>
-    <button id="clearChat" style="
-      margin-top: 5px;
-      padding: 6px;
-      font-size: 10px;
-      background: #444;
-    ">Xóa lịch sử</button>
   </div>
 
   <script src="sidebar.js"></script>

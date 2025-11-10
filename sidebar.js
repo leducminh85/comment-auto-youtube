@@ -21,14 +21,17 @@ document.addEventListener('DOMContentLoaded', () => {
   const resetPromptBtn = document.getElementById('resetPrompt');
   const promptStatus = document.getElementById('promptStatus');
   
-  // **UPDATE**: Thêm selector cho context mode
   const contextModeBtns = document.querySelectorAll('.context-mode-btn');
+  
+  // **UPDATE**: Lấy các container UI
+  const promptModeContainer = document.getElementById('promptModeContainer');
+  const chatbotModeContainer = document.getElementById('chatbotModeContainer');
 
   const DEFAULT_PROMPT = `Bạn là chủ kênh YouTube. Hãy trả lời bình luận này một cách thân thiện, tích cực, ngắn gọn bằng tiếng Việt (hoặc tiếng Anh nếu comment bằng tiếng Anh). Chỉ trả lời nội dung, không giải thích.\n\nBình luận: "{{COMMENT}}"`;
 
   let isRunning = false;
   let currentMode = 'continuous';
-  let currentContextMode = 'prompt'; // **UPDATE**: Mặc định
+  let currentContextMode = 'prompt';
 
   // === COLLAPSIBLE API KEY ===
   apiKeyToggle.addEventListener('click', () => {
@@ -47,7 +50,18 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // **UPDATE**: === CONTEXT MODE TOGGLE ===
+  // **UPDATE**: Hàm cập nhật giao diện ngữ cảnh
+  function updateContextUI(mode) {
+    if (mode === 'prompt') {
+      promptModeContainer.style.display = 'block';
+      chatbotModeContainer.style.display = 'none';
+    } else { // 'chatbot'
+      promptModeContainer.style.display = 'none';
+      chatbotModeContainer.style.display = 'block';
+    }
+  }
+
+  // === CONTEXT MODE TOGGLE ===
   contextModeBtns.forEach(btn => {
     btn.addEventListener('click', () => {
       contextModeBtns.forEach(b => b.classList.remove('active'));
@@ -55,21 +69,21 @@ document.addEventListener('DOMContentLoaded', () => {
       currentContextMode = btn.dataset.contextMode;
       chrome.storage.local.set({ contextMode: currentContextMode });
       appendLog(`Context source switched to: ${currentContextMode}`);
+      updateContextUI(currentContextMode); // **UPDATE**: Gọi hàm cập nhật UI
     });
   });
 
   // === LOAD DATA ===
-  // **UPDATE**: Lấy thêm `contextMode` khi load
   chrome.storage.local.get(['apiKey', 'customPrompt', 'contextMode'], (result) => {
     if (result.apiKey) apiKeyInput.value = result.apiKey;
     customPrompt.value = result.customPrompt || DEFAULT_PROMPT;
     promptStatus.textContent = result.customPrompt ? 'Tùy chỉnh' : 'Mặc định';
 
-    // **UPDATE**: Cập nhật UI cho context mode đã lưu
     currentContextMode = result.contextMode || 'prompt';
     contextModeBtns.forEach(btn => {
         btn.classList.toggle('active', btn.dataset.contextMode === currentContextMode);
     });
+    updateContextUI(currentContextMode); // **UPDATE**: Gọi hàm để đặt UI đúng trạng thái lúc khởi động
   });
 
   // === SAVE KEY ===

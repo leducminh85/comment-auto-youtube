@@ -183,7 +183,7 @@ document.addEventListener('DOMContentLoaded', () => {
       commentText.textContent = msg.comment;
       replyText.value = msg.reply;
       replyText.focus();
-      replyText.select();
+      // replyText.select();
       appendLog('Preview ready');
     } else if (msg.action === 'hidePreview') {
       preview.style.display = 'none';

@@ -1,3 +1,5 @@
+// --- START OF FILE content.js ---
+
 let isRunning = false;
 let currentMode = 'continuous';
 let apiKey = '';
@@ -227,27 +229,38 @@ function moveToNextComment() {
 async function generateReply(commentText, retries = 3) {
   for (let i = 0; i < retries; i++) {
     try {
-      // LẤY LỊCH SỬ CHAT
+      // **UPDATE**: LẤY THÊM `contextMode` TỪ STORAGE
       const stored = await new Promise(resolve => {
-        chrome.storage.local.get(['customPrompt', 'chatHistory'], resolve);
+        chrome.storage.local.get(['customPrompt', 'chatHistory', 'contextMode'], resolve);
       });
-
-      const rawPrompt = stored.customPrompt || `Bạn là chủ kênh YouTube. Hãy trả lời bình luận này một cách thân thiện, tích cực, ngắn gọn bằng tiếng Việt (hoặc tiếng Anh nếu comment bằng tiếng Anh). Chỉ trả lời nội dung, không giải thích.\n\nBình luận: "{{COMMENT}}"`;
-
-      // TẠO PROMPT CÓ NGỮ CẢNH TỪ CHAT
+      
+      const contextMode = stored.contextMode || 'prompt'; // Mặc định là 'prompt'
       let contents = [];
 
-      // Thêm lịch sử chat (nếu có)
-      if (stored.chatHistory && Array.isArray(stored.chatHistory)) {
-        contents = stored.chatHistory.map(msg => ({
-          role: msg.role === 'user' ? 'user' : 'model',
-          parts: [{ text: msg.parts[0].text }]
-        }));
-      }
+      // **UPDATE**: Xây dựng payload `contents` dựa trên `contextMode`
+      if (contextMode === 'chatbot') {
+        // --- Chế độ Chatbot: Dùng lịch sử chat làm ngữ cảnh ---
+        logToSidebar('Context: Chat History');
+        
+        // Thêm lịch sử chat (nếu có)
+        if (stored.chatHistory && Array.isArray(stored.chatHistory)) {
+          contents = stored.chatHistory.map(msg => ({
+            role: msg.role === 'user' ? 'user' : 'model',
+            parts: [{ text: msg.parts[0].text }]
+          }));
+        }
+        
+        // Thêm yêu cầu trả lời bình luận hiện tại
+        const finalPrompt = `Dựa vào toàn bộ bối cảnh cuộc trò chuyện ở trên, hãy trả lời bình luận YouTube này một cách ngắn gọn và phù hợp:\n\nBình luận: "${commentText}"\n\nLưu ý: Chỉ trả về nội dung câu trả lời, không giải thích thêm.`;
+        contents.push({ role: 'user', parts: [{ text: finalPrompt }] });
 
-      // Thêm prompt chính
-      const finalPrompt = rawPrompt.replace(/{{COMMENT}}/g, commentText);
-      contents.push({ role: 'user', parts: [{ text: finalPrompt }] });
+      } else {
+        // --- Chế độ Prompt (Mặc định): Dùng prompt cố định ---
+        logToSidebar('Context: Custom Prompt');
+        const rawPrompt = stored.customPrompt || `Bạn là chủ kênh YouTube. Hãy trả lời bình luận này một cách thân thiện, tích cực, ngắn gọn bằng tiếng Việt (hoặc tiếng Anh nếu comment bằng tiếng Anh). Chỉ trả lời nội dung, không giải thích.\n\nBình luận: "{{COMMENT}}"`;
+        const finalPrompt = rawPrompt.replace(/{{COMMENT}}/g, commentText);
+        contents.push({ role: 'user', parts: [{ text: finalPrompt }] });
+      }
 
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
         method: 'POST',
@@ -279,3 +292,4 @@ async function generateReply(commentText, retries = 3) {
   }
   return null;
 }
+// --- END OF FILE content.js ---

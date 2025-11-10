@@ -1,3 +1,5 @@
+// --- START OF FILE sidebar.js ---
+
 document.addEventListener('DOMContentLoaded', () => {
   const apiKeyToggle = document.getElementById('apiKeyToggle');
   const apiKeyContent = document.getElementById('apiKeyContent');
@@ -18,11 +20,15 @@ document.addEventListener('DOMContentLoaded', () => {
   const savePromptBtn = document.getElementById('savePrompt');
   const resetPromptBtn = document.getElementById('resetPrompt');
   const promptStatus = document.getElementById('promptStatus');
+  
+  // **UPDATE**: Thêm selector cho context mode
+  const contextModeBtns = document.querySelectorAll('.context-mode-btn');
 
   const DEFAULT_PROMPT = `Bạn là chủ kênh YouTube. Hãy trả lời bình luận này một cách thân thiện, tích cực, ngắn gọn bằng tiếng Việt (hoặc tiếng Anh nếu comment bằng tiếng Anh). Chỉ trả lời nội dung, không giải thích.\n\nBình luận: "{{COMMENT}}"`;
 
   let isRunning = false;
   let currentMode = 'continuous';
+  let currentContextMode = 'prompt'; // **UPDATE**: Mặc định
 
   // === COLLAPSIBLE API KEY ===
   apiKeyToggle.addEventListener('click', () => {
@@ -41,11 +47,29 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  // **UPDATE**: === CONTEXT MODE TOGGLE ===
+  contextModeBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      contextModeBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentContextMode = btn.dataset.contextMode;
+      chrome.storage.local.set({ contextMode: currentContextMode });
+      appendLog(`Context source switched to: ${currentContextMode}`);
+    });
+  });
+
   // === LOAD DATA ===
-  chrome.storage.local.get(['apiKey', 'customPrompt'], (result) => {
+  // **UPDATE**: Lấy thêm `contextMode` khi load
+  chrome.storage.local.get(['apiKey', 'customPrompt', 'contextMode'], (result) => {
     if (result.apiKey) apiKeyInput.value = result.apiKey;
     customPrompt.value = result.customPrompt || DEFAULT_PROMPT;
     promptStatus.textContent = result.customPrompt ? 'Tùy chỉnh' : 'Mặc định';
+
+    // **UPDATE**: Cập nhật UI cho context mode đã lưu
+    currentContextMode = result.contextMode || 'prompt';
+    contextModeBtns.forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.contextMode === currentContextMode);
+    });
   });
 
   // === SAVE KEY ===
@@ -236,109 +260,110 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // === CHATBOT AI ===
-const chatbotToggle = document.getElementById('chatbotToggle');
-const chatbotContent = document.getElementById('chatbotContent');
-const chatMessages = document.getElementById('chatMessages');
-const chatInput = document.getElementById('chatInput');
-const sendChat = document.getElementById('sendChat');
-const clearChatBtn = document.getElementById('clearChat');
+  const chatbotToggle = document.getElementById('chatbotToggle');
+  const chatbotContent = document.getElementById('chatbotContent');
+  const chatMessages = document.getElementById('chatMessages');
+  const chatInput = document.getElementById('chatInput');
+  const sendChat = document.getElementById('sendChat');
+  const clearChatBtn = document.getElementById('clearChat');
 
-let chatHistory = [];
+  let chatHistory = [];
 
-// Load chat history
-chrome.storage.local.get(['chatHistory'], (result) => {
-  if (result.chatHistory) {
-    chatHistory = result.chatHistory;
-    renderChat();
-  }
-});
-
-// Toggle chatbot
-chatbotToggle.addEventListener('click', () => {
-  const isOpen = chatbotContent.style.display === 'block';
-  chatbotContent.style.display = isOpen ? 'none' : 'block';
-  chatbotToggle.classList.toggle('open', !isOpen);
-  if (!isOpen) chatInput.focus();
-});
-
-// Send message
-sendChat.addEventListener('click', sendChatMessage);
-chatInput.addEventListener('keypress', (e) => {
-  if (e.key === 'Enter') sendChatMessage();
-});
-
-async function sendChatMessage() {
-  const userText = chatInput.value.trim();
-  if (!userText) return;
-
-  // Add user message
-  chatHistory.push({ role: 'user', parts: [{ text: userText }] });
-  renderChat();
-  chatInput.value = '';
-  appendLog('Chat: ' + userText);
-
-  setProcessing(true);
-  status.textContent = 'AI đang suy nghĩ...';
-
-  try {
-    const result = await chrome.storage.local.get(['apiKey']);
-    const apiKey = result.apiKey;
-    if (!apiKey) throw new Error('Thiếu API Key');
-
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: chatHistory })
-    });
-
-    const data = await response.json();
-    if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
-      const aiText = data.candidates[0].content.parts[0].text.trim();
-      chatHistory.push({ role: 'model', parts: [{ text: aiText }] });
+  // Load chat history
+  chrome.storage.local.get(['chatHistory'], (result) => {
+    if (result.chatHistory) {
+      chatHistory = result.chatHistory;
       renderChat();
-      appendLog('AI: ' + aiText.substring(0, 50) + '...');
-    } else {
-      throw new Error(data.error?.message || 'Không có phản hồi');
     }
-  } catch (err) {
-    appendLog('Chat error: ' + err.message);
-    chatMessages.innerHTML += `<div style="color:#f66; font-style:italic;">Lỗi: ${err.message}</div>`;
-  } finally {
-    setProcessing(false);
-    status.textContent = isRunning ? `Running: ${currentMode}` : 'Ready';
-    saveChatHistory();
-  }
-}
-
-// Render chat
-function renderChat() {
-  chatMessages.innerHTML = '';
-  chatHistory.forEach(msg => {
-    const div = document.createElement('div');
-    div.style.margin = '6px 0';
-    div.style.padding = '6px 8px';
-    div.style.borderRadius = '6px';
-    div.style.maxWidth = '90%';
-    div.style.alignSelf = msg.role === 'user' ? 'flex-end' : 'flex-start';
-    div.style.background = msg.role === 'user' ? 'var(--neon-purple)' : '#333';
-    div.style.color = msg.role === 'user' ? '#000' : 'var(--text)';
-    div.style.fontSize = '11px';
-    div.textContent = msg.parts[0].text;
-    chatMessages.appendChild(div);
   });
-  chatMessages.scrollTop = chatMessages.scrollHeight;
-}
 
-// Save chat history
-function saveChatHistory() {
-  chrome.storage.local.set({ chatHistory });
-}
+  // Toggle chatbot
+  chatbotToggle.addEventListener('click', () => {
+    const isOpen = chatbotContent.style.display === 'block';
+    chatbotContent.style.display = isOpen ? 'none' : 'block';
+    chatbotToggle.classList.toggle('open', !isOpen);
+    if (!isOpen) chatInput.focus();
+  });
 
-// Clear chat
-clearChatBtn.addEventListener('click', () => {
-  chatHistory = [];
-  renderChat();
-  chrome.storage.local.remove('chatHistory');
-  appendLog('Chat history cleared');
+  // Send message
+  sendChat.addEventListener('click', sendChatMessage);
+  chatInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') sendChatMessage();
+  });
+
+  async function sendChatMessage() {
+    const userText = chatInput.value.trim();
+    if (!userText) return;
+
+    // Add user message
+    chatHistory.push({ role: 'user', parts: [{ text: userText }] });
+    renderChat();
+    chatInput.value = '';
+    appendLog('Chat: ' + userText);
+
+    setProcessing(true);
+    status.textContent = 'AI đang suy nghĩ...';
+
+    try {
+      const result = await chrome.storage.local.get(['apiKey']);
+      const apiKey = result.apiKey;
+      if (!apiKey) throw new Error('Thiếu API Key');
+
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: chatHistory })
+      });
+
+      const data = await response.json();
+      if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
+        const aiText = data.candidates[0].content.parts[0].text.trim();
+        chatHistory.push({ role: 'model', parts: [{ text: aiText }] });
+        renderChat();
+        appendLog('AI: ' + aiText.substring(0, 50) + '...');
+      } else {
+        throw new Error(data.error?.message || 'Không có phản hồi');
+      }
+    } catch (err) {
+      appendLog('Chat error: ' + err.message);
+      chatMessages.innerHTML += `<div style="color:#f66; font-style:italic;">Lỗi: ${err.message}</div>`;
+    } finally {
+      setProcessing(false);
+      status.textContent = isRunning ? `Running: ${currentMode}` : 'Ready';
+      saveChatHistory();
+    }
+  }
+
+  // Render chat
+  function renderChat() {
+    chatMessages.innerHTML = '';
+    chatHistory.forEach(msg => {
+      const div = document.createElement('div');
+      div.style.margin = '6px 0';
+      div.style.padding = '6px 8px';
+      div.style.borderRadius = '6px';
+      div.style.maxWidth = '90%';
+      div.style.alignSelf = msg.role === 'user' ? 'flex-end' : 'flex-start';
+      div.style.background = msg.role === 'user' ? 'var(--neon-purple)' : '#333';
+      div.style.color = msg.role === 'user' ? '#000' : 'var(--text)';
+      div.style.fontSize = '11px';
+      div.textContent = msg.parts[0].text;
+      chatMessages.appendChild(div);
+    });
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
+  // Save chat history
+  function saveChatHistory() {
+    chrome.storage.local.set({ chatHistory });
+  }
+
+  // Clear chat
+  clearChatBtn.addEventListener('click', () => {
+    chatHistory = [];
+    renderChat();
+    chrome.storage.local.remove('chatHistory');
+    appendLog('Chat history cleared');
+  });
 });
-});
+// --- END OF FILE sidebar.js ---

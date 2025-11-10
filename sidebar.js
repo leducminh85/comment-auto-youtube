@@ -236,6 +236,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const chatInput = document.getElementById('chatInput');
   const sendChat = document.getElementById('sendChat');
   const clearChatBtn = document.getElementById('clearChat');
+  const chatLoadingIndicator = document.getElementById('chatLoadingIndicator'); // <-- UPDATED
   let chatHistory = [];
 
   chrome.storage.local.get(['chatHistory'], (result) => {
@@ -245,13 +246,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  // UPDATED: Function to auto-scroll on open
   chatbotToggle.addEventListener('click', () => {
     const isOpen = chatbotContent.style.display === 'block';
     chatbotContent.style.display = isOpen ? 'none' : 'block';
     chatbotToggle.classList.toggle('open', !isOpen);
-    if (!isOpen) chatInput.focus();
+    
+    if (!isOpen) { // If it was just opened
+      chatInput.focus();
+      // Use a timeout to ensure the DOM is visible before scrolling
+      setTimeout(() => {
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      }, 50);
+    }
   });
 
+  // UPDATED: Function to show loading indicator
   const sendChatMessage = async () => {
     const userText = chatInput.value.trim();
     if (!userText) return;
@@ -261,6 +271,8 @@ document.addEventListener('DOMContentLoaded', () => {
     chatInput.value = '';
     appendLog('Chat (User): ' + userText);
 
+    chatLoadingIndicator.style.display = 'flex'; // Show loading
+    chatMessages.scrollTop = chatMessages.scrollHeight; // Scroll to see loading
     status.textContent = 'AI is thinking...';
 
     try {
@@ -286,8 +298,10 @@ document.addEventListener('DOMContentLoaded', () => {
       appendLog('Chat error: ' + err.message);
       chatMessages.innerHTML += `<div class="chat-message" style="color:var(--danger);">${err.message}</div>`;
     } finally {
+      chatLoadingIndicator.style.display = 'none'; // Always hide loading when done
       status.textContent = isRunning ? `Running: ${currentMode}` : 'Ready';
       saveChatHistory();
+      chatMessages.scrollTop = chatMessages.scrollHeight; // Scroll to the latest message
     }
   };
 
@@ -297,13 +311,15 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   function renderChat() {
-    chatMessages.innerHTML = '';
+    chatMessages.innerHTML = ''; // Clear previous messages
     chatHistory.forEach(msg => {
       const div = document.createElement('div');
       div.classList.add('chat-message', msg.role === 'user' ? 'user' : 'model');
       div.textContent = msg.parts[0].text;
       chatMessages.appendChild(div);
     });
+    // Re-append the loading indicator at the end so it's always there
+    chatMessages.appendChild(chatLoadingIndicator);
     chatMessages.scrollTop = chatMessages.scrollHeight;
   }
 

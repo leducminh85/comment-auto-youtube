@@ -247,11 +247,11 @@
       align-self: flex-start; background: #333; color: var(--text);
       border-bottom-left-radius: 4px;
     }
-    #chatInputContainer { display: flex; gap: 8px; margin-bottom: 8px; }
+    #chatInputContainer { display: flex; gap: 8px; }
     #chatInput { flex: 1; min-width: 0; }
     #sendChat { flex-shrink: 0; width: auto; padding: 0 20px; }
 
-    /* === NEW CHAT LOADING INDICATOR === */
+    /* === CHAT LOADING INDICATOR === */
     #chatLoadingIndicator .dot {
       width: 8px;
       height: 8px;
@@ -275,6 +275,111 @@
       40% {
         transform: scale(1.0);
       }
+    }
+    
+    /* === UPDATED: HEADER & CHAT OPTIONS MENU === */
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .chat-options-container {
+      position: relative;
+    }
+
+    .icon-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 50%;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .icon-btn:hover {
+      background-color: rgba(255, 255, 255, 0.1);
+      color: var(--text);
+    }
+
+    .chat-options-menu {
+      display: none; /* Will be toggled by JS */
+      position: absolute;
+      top: 100%; /* UPDATED: Show menu below the button */
+      right: 0;
+      margin-top: 4px; /* Space between button and menu */
+      background-color: #3e3e3e;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      z-index: 10;
+      width: 220px;
+      padding: 8px;
+    }
+
+    .chat-options-menu .menu-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .chat-options-menu .menu-item:hover {
+      background-color: rgba(255, 255, 255, 0.08);
+    }
+    .chat-options-menu .menu-item label {
+        cursor: pointer;
+    }
+
+    /* Custom Toggle Switch CSS */
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 38px;
+      height: 22px;
+    }
+    .switch input { 
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #555;
+      transition: .4s;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 16px;
+      width: 16px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .4s;
+    }
+    input:checked + .slider {
+      background-color: var(--neon-purple);
+    }
+    input:checked + .slider:before {
+      transform: translateX(16px);
+    }
+    .slider.round {
+      border-radius: 22px;
+    }
+    .slider.round:before {
+      border-radius: 50%;
     }
   </style>
 </head>
@@ -334,12 +439,34 @@
   </div>
 
   <div id="chatbotModeContainer" class="section" style="display: none;">
+    <!-- UPDATED: Collapsible Header now contains the options button -->
     <div class="collapsible" id="chatbotToggle">
-      <span>🤖 Chatbot AI (Context)</span><span class="arrow">›</span>
+      <span>🤖 Chatbot AI (Context)</span>
+      <div class="header-controls">
+        <!-- The options menu structure is MOVED here -->
+        <div class="chat-options-container">
+          <button id="chatOptionsBtn" class="icon-btn" title="Chatbot Options">
+            <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24" fill="currentColor"><path d="M19.43 12.98c.04-.32.07-.64.07-.98s-.03-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65C14.46 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.49.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1c-.23-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.07.65-.07.98s.03.66.07.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49-.42l.38-2.65c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.65zM12 15.5c-1.93 0-3.5-1.57-3.5-3.5s1.57-3.5 3.5-3.5 3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z"></path></svg>
+          </button>
+          <div id="chatOptionsMenu" class="chat-options-menu">
+            <div class="menu-item">
+              <label for="autoSaveToggle">Lưu trả lời thủ công</label>
+              <label class="switch">
+                <input type="checkbox" id="autoSaveToggle" checked>
+                <span class="slider round"></span>
+              </label>
+            </div>
+            <div class="menu-item" id="clearChatBtn">
+              <span style="color: var(--danger);">Xóa lịch sử trò chuyện</span>
+            </div>
+          </div>
+        </div>
+        <span class="arrow">›</span>
+      </div>
     </div>
+    
     <div class="collapse-content" id="chatbotContent">
       <div id="chatMessages">
-        <!-- NEW Loading Indicator Element -->
         <div id="chatLoadingIndicator" class="chat-message model" style="display: none; align-items: center; gap: 5px;">
           <span class="dot"></span>
           <span class="dot"></span>
@@ -350,7 +477,7 @@
         <input type="text" id="chatInput" placeholder="Ask AI..." class="input-field">
         <button id="sendChat" class="btn btn-primary">Send</button>
       </div>
-      <button id="clearChat" class="btn btn-secondary">Clear History</button>
+      <!-- The options menu has been moved from here to the header above -->
     </div>
   </div>
   

@@ -30,6 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let isRunning = false;
   let currentMode = 'continuous';
   let currentContextMode = 'prompt';
+  let autoSaveReplies = true; // <-- NEW: State variable for the new option
 
   // === COLLAPSIBLES ===
   apiKeyToggle.addEventListener('click', () => {
@@ -66,7 +67,8 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // === LOAD DATA ===
-  chrome.storage.local.get(['apiKey', 'customPrompt', 'contextMode'], (result) => {
+  // UPDATED: Load the new autoSaveReplies setting
+  chrome.storage.local.get(['apiKey', 'customPrompt', 'contextMode', 'chatHistory', 'autoSaveReplies'], (result) => {
     if (result.apiKey) apiKeyInput.value = result.apiKey;
     customPrompt.value = result.customPrompt || DEFAULT_PROMPT;
     promptStatus.textContent = result.customPrompt ? 'Status: Custom' : 'Status: Default';
@@ -76,9 +78,18 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.classList.toggle('active', btn.dataset.contextMode === currentContextMode);
     });
     updateContextUI(currentContextMode);
+    
+    if (result.chatHistory) {
+      chatHistory = result.chatHistory;
+      renderChat();
+    }
+    
+    // Load and apply the setting, default to true if not set
+    autoSaveReplies = result.autoSaveReplies !== false;
+    autoSaveToggle.checked = autoSaveReplies;
   });
 
-  // === SAVE KEY ===
+  // === SAVE KEY, SAVE PROMPT, RESET PROMPT functions (no changes here) ...
   saveKeyBtn.addEventListener('click', () => {
     const key = apiKeyInput.value.trim();
     if (key) {
@@ -98,7 +109,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // === SAVE PROMPT ===
   savePromptBtn.addEventListener('click', () => {
     const p = customPrompt.value.trim();
     if (p) {
@@ -113,7 +123,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // === RESET PROMPT ===
   resetPromptBtn.addEventListener('click', () => {
     customPrompt.value = DEFAULT_PROMPT;
     chrome.storage.local.remove('customPrompt', () => {
@@ -124,7 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // === TOGGLE START/STOP ===
+  // === TOGGLE START/STOP functions (no changes here) ...
   toggleBtn.addEventListener('click', () => {
     if (isRunning) stopProcessing();
     else startProcessing();
@@ -153,7 +162,7 @@ document.addEventListener('DOMContentLoaded', () => {
         isRunning = true;
         toggleBtn.textContent = 'Stop';
         toggleBtn.classList.remove('btn-primary');
-        toggleBtn.classList.add('btn-danger'); // **UPDATE**: Use danger class
+        toggleBtn.classList.add('btn-danger');
         status.textContent = `Running: ${currentMode}`;
         status.style.color = 'var(--success)';
         appendLog(`Started in ${currentMode} mode`);
@@ -168,7 +177,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     isRunning = false;
     toggleBtn.textContent = 'Start';
-    toggleBtn.classList.remove('btn-danger'); // **UPDATE**: Remove danger class
+    toggleBtn.classList.remove('btn-danger');
     toggleBtn.classList.add('btn-primary');
     status.textContent = 'Stopped';
     status.style.color = 'var(--danger)';
@@ -176,44 +185,36 @@ document.addEventListener('DOMContentLoaded', () => {
     appendLog('Stopped');
   }
 
+
   // === PREVIEW & MESSAGES ===
-chrome.runtime.onMessage.addListener((msg) => {
-  if (msg.action === 'showPreview') {
-    preview.style.display = 'block';
-    commentText.textContent = msg.comment;
-    replyText.value = msg.reply;
-    replyText.focus();
-    appendLog('Preview ready');
-  } else if (msg.action === 'hidePreview') {
-    preview.style.display = 'none';
-  } else if (msg.action === 'setLoading') {
-    status.textContent = msg.loading ? 'Loading...' : `Running: ${currentMode}`;
-  } else if (msg.action === 'log') {
-    appendLog(msg.text);
-  
-  // ▼▼▼ THÊM TOÀN BỘ KHỐI 'else if' NÀY VÀO ▼▼▼
-  } else if (msg.action === 'addToChatHistory') {
-    // Chỉ thêm vào history nếu đang ở chế độ chatbot
-    if (currentContextMode === 'chatbot') {
-      const { comment, reply } = msg;
-      
-      // Thêm bình luận như một tin nhắn của 'user'
-      chatHistory.push({ role: 'user', parts: [{ text: comment }] });
-      // Thêm câu trả lời như một tin nhắn của 'model' (AI)
-      chatHistory.push({ role: 'model', parts: [{ text: reply }] });
-      
-      // Lưu lại lịch sử mới và cập nhật giao diện chat
-      saveChatHistory();
-      renderChat();
-      
-      appendLog('Manual reply saved to chat context.');
+  // UPDATED: The listener for 'addToChatHistory'
+  chrome.runtime.onMessage.addListener((msg) => {
+    if (msg.action === 'showPreview') {
+      preview.style.display = 'block';
+      commentText.textContent = msg.comment;
+      replyText.value = msg.reply;
+      replyText.focus();
+      appendLog('Preview ready');
+    } else if (msg.action === 'hidePreview') {
+      preview.style.display = 'none';
+    } else if (msg.action === 'setLoading') {
+      status.textContent = msg.loading ? 'Loading...' : `Running: ${currentMode}`;
+    } else if (msg.action === 'log') {
+      appendLog(msg.text);
+    } else if (msg.action === 'addToChatHistory') {
+      // NOW, IT CHECKS THE OPTION BEFORE SAVING
+      if (currentContextMode === 'chatbot' && autoSaveReplies) {
+        const { comment, reply } = msg;
+        chatHistory.push({ role: 'user', parts: [{ text: comment }] });
+        chatHistory.push({ role: 'model', parts: [{ text: reply }] });
+        saveChatHistory();
+        renderChat();
+        appendLog('Manual reply saved to chat context.');
+      }
     }
-  // ▲▲▲ KẾT THÚC PHẦN THÊM MỚI ▲▲▲
+  });
 
-  }
-});
-
-  // === PREVIEW BUTTONS ===
+  // === PREVIEW BUTTONS (no changes here) ...
   regenerateBtn.addEventListener('click', () => {
     status.textContent = 'Regenerating...';
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -236,7 +237,7 @@ chrome.runtime.onMessage.addListener((msg) => {
     appendLog('Skipped → next comment');
   });
 
-  // === LOG ===
+  // === LOG (no changes here) ...
   function appendLog(msg) {
     const t = new Date().toLocaleTimeString();
     logBox.textContent += `[${t}] ${msg}\n`;
@@ -254,33 +255,51 @@ chrome.runtime.onMessage.addListener((msg) => {
   const chatMessages = document.getElementById('chatMessages');
   const chatInput = document.getElementById('chatInput');
   const sendChat = document.getElementById('sendChat');
-  const clearChatBtn = document.getElementById('clearChat');
-  const chatLoadingIndicator = document.getElementById('chatLoadingIndicator'); // <-- UPDATED
+  const chatLoadingIndicator = document.getElementById('chatLoadingIndicator');
   let chatHistory = [];
-
-  chrome.storage.local.get(['chatHistory'], (result) => {
-    if (result.chatHistory) {
-      chatHistory = result.chatHistory;
-      renderChat();
+  
+  // ▼▼▼ NEW: GETTING NEW MENU ELEMENTS ▼▼▼
+  const chatOptionsBtn = document.getElementById('chatOptionsBtn');
+  const chatOptionsMenu = document.getElementById('chatOptionsMenu');
+  const autoSaveToggle = document.getElementById('autoSaveToggle');
+  const clearChatBtn = document.getElementById('clearChatBtn'); // Note the ID change
+  
+  // Logic to open/close the new menu
+  chatOptionsBtn.addEventListener('click', (event) => {
+    event.stopPropagation(); // Prevent window listener from closing it immediately
+    const isMenuOpen = chatOptionsMenu.style.display === 'block';
+    chatOptionsMenu.style.display = isMenuOpen ? 'none' : 'block';
+  });
+  
+  // Logic to handle the new toggle switch
+  autoSaveToggle.addEventListener('change', () => {
+    autoSaveReplies = autoSaveToggle.checked;
+    chrome.storage.local.set({ autoSaveReplies: autoSaveReplies });
+    appendLog(`Auto-save manual replies: ${autoSaveReplies ? 'ON' : 'OFF'}`);
+    chatOptionsMenu.style.display = 'none'; // Close menu after action
+  });
+  
+  // Close menu when clicking outside
+  window.addEventListener('click', () => {
+    if (chatOptionsMenu.style.display === 'block') {
+      chatOptionsMenu.style.display = 'none';
     }
   });
+  // ▲▲▲ END OF NEW MENU LOGIC ▲▲▲
 
-  // UPDATED: Function to auto-scroll on open
   chatbotToggle.addEventListener('click', () => {
     const isOpen = chatbotContent.style.display === 'block';
     chatbotContent.style.display = isOpen ? 'none' : 'block';
     chatbotToggle.classList.toggle('open', !isOpen);
     
-    if (!isOpen) { // If it was just opened
+    if (!isOpen) {
       chatInput.focus();
-      // Use a timeout to ensure the DOM is visible before scrolling
       setTimeout(() => {
         chatMessages.scrollTop = chatMessages.scrollHeight;
       }, 50);
     }
   });
 
-  // UPDATED: Function to show loading indicator
   const sendChatMessage = async () => {
     const userText = chatInput.value.trim();
     if (!userText) return;
@@ -290,8 +309,8 @@ chrome.runtime.onMessage.addListener((msg) => {
     chatInput.value = '';
     appendLog('Chat (User): ' + userText);
 
-    chatLoadingIndicator.style.display = 'flex'; // Show loading
-    chatMessages.scrollTop = chatMessages.scrollHeight; // Scroll to see loading
+    chatLoadingIndicator.style.display = 'flex';
+    chatMessages.scrollTop = chatMessages.scrollHeight;
     status.textContent = 'AI is thinking...';
 
     try {
@@ -317,10 +336,10 @@ chrome.runtime.onMessage.addListener((msg) => {
       appendLog('Chat error: ' + err.message);
       chatMessages.innerHTML += `<div class="chat-message" style="color:var(--danger);">${err.message}</div>`;
     } finally {
-      chatLoadingIndicator.style.display = 'none'; // Always hide loading when done
+      chatLoadingIndicator.style.display = 'none';
       status.textContent = isRunning ? `Running: ${currentMode}` : 'Ready';
       saveChatHistory();
-      chatMessages.scrollTop = chatMessages.scrollHeight; // Scroll to the latest message
+      chatMessages.scrollTop = chatMessages.scrollHeight;
     }
   };
 
@@ -330,14 +349,13 @@ chrome.runtime.onMessage.addListener((msg) => {
   });
 
   function renderChat() {
-    chatMessages.innerHTML = ''; // Clear previous messages
+    chatMessages.innerHTML = '';
     chatHistory.forEach(msg => {
       const div = document.createElement('div');
       div.classList.add('chat-message', msg.role === 'user' ? 'user' : 'model');
       div.textContent = msg.parts[0].text;
       chatMessages.appendChild(div);
     });
-    // Re-append the loading indicator at the end so it's always there
     chatMessages.appendChild(chatLoadingIndicator);
     chatMessages.scrollTop = chatMessages.scrollHeight;
   }
@@ -346,11 +364,13 @@ chrome.runtime.onMessage.addListener((msg) => {
     chrome.storage.local.set({ chatHistory });
   }
 
+  // UPDATED: Event listener for the new clear button
   clearChatBtn.addEventListener('click', () => {
     chatHistory = [];
     renderChat();
     chrome.storage.local.remove('chatHistory');
     appendLog('Chat history cleared');
+    chatOptionsMenu.style.display = 'none'; // Close menu after action
   });
 });
 // --- END OF FILE sidebar.js ---

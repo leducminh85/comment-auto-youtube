@@ -174,9 +174,30 @@ async function autoApplyReply(replyText) {
 
 async function applyReplyToCurrent(replyText) {
   if (!currentCommentEl) return;
+  
+  // Lấy nội dung comment gốc để gửi về cho chatbot history
+  const commentText = currentCommentEl.querySelector('#content-text')?.innerText.trim();
+
   const ok = await fillAndSendReplyIn(currentCommentEl, replyText);
-  if (ok) markAsReplied(currentCommentEl);
-  else markAsFailed(currentCommentEl);
+  
+  if (ok) {
+    markAsReplied(currentCommentEl);
+    
+    // ▼▼▼ LOGIC MỚI ĐƯỢC THÊM VÀO ▼▼▼
+    // Nếu gửi thành công VÀ lấy được comment gốc, gửi message về sidebar
+    if (commentText) {
+      chrome.runtime.sendMessage({
+        action: 'addToChatHistory',
+        comment: commentText,
+        reply: replyText
+      });
+    }
+    // ▲▲▲ KẾT THÚC LOGIC MỚI ▲▲▲
+
+  } else {
+    markAsFailed(currentCommentEl);
+  }
+  
   chrome.runtime.sendMessage({ action: 'hidePreview' });
   moveToNextComment();
 }

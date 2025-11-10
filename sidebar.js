@@ -177,22 +177,41 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // === PREVIEW & MESSAGES ===
-  chrome.runtime.onMessage.addListener((msg) => {
-    if (msg.action === 'showPreview') {
-      preview.style.display = 'block';
-      commentText.textContent = msg.comment;
-      replyText.value = msg.reply;
-      replyText.focus();
-      // replyText.select();
-      appendLog('Preview ready');
-    } else if (msg.action === 'hidePreview') {
-      preview.style.display = 'none';
-    } else if (msg.action === 'setLoading') {
-      status.textContent = msg.loading ? 'Loading...' : `Running: ${currentMode}`;
-    } else if (msg.action === 'log') {
-      appendLog(msg.text);
+chrome.runtime.onMessage.addListener((msg) => {
+  if (msg.action === 'showPreview') {
+    preview.style.display = 'block';
+    commentText.textContent = msg.comment;
+    replyText.value = msg.reply;
+    replyText.focus();
+    appendLog('Preview ready');
+  } else if (msg.action === 'hidePreview') {
+    preview.style.display = 'none';
+  } else if (msg.action === 'setLoading') {
+    status.textContent = msg.loading ? 'Loading...' : `Running: ${currentMode}`;
+  } else if (msg.action === 'log') {
+    appendLog(msg.text);
+  
+  // ▼▼▼ THÊM TOÀN BỘ KHỐI 'else if' NÀY VÀO ▼▼▼
+  } else if (msg.action === 'addToChatHistory') {
+    // Chỉ thêm vào history nếu đang ở chế độ chatbot
+    if (currentContextMode === 'chatbot') {
+      const { comment, reply } = msg;
+      
+      // Thêm bình luận như một tin nhắn của 'user'
+      chatHistory.push({ role: 'user', parts: [{ text: comment }] });
+      // Thêm câu trả lời như một tin nhắn của 'model' (AI)
+      chatHistory.push({ role: 'model', parts: [{ text: reply }] });
+      
+      // Lưu lại lịch sử mới và cập nhật giao diện chat
+      saveChatHistory();
+      renderChat();
+      
+      appendLog('Manual reply saved to chat context.');
     }
-  });
+  // ▲▲▲ KẾT THÚC PHẦN THÊM MỚI ▲▲▲
+
+  }
+});
 
   // === PREVIEW BUTTONS ===
   regenerateBtn.addEventListener('click', () => {

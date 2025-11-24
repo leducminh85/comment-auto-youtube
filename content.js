@@ -26,13 +26,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   } else if (message.action === 'applyReply') {
     applyReplyToCurrent(message.reply);
   } else if (message.action === 'skipAndNext') {
-    // ĐÁNH DẤU LÀ SKIP + ĐÓNG HỘP + CHUYỂN COMMENT MỚI
     if (currentCommentEl) {
       markAsSkipped(currentCommentEl);
     }
     hideReplyBox();
     currentCommentEl = null;
-    chrome.runtime.sendMessage({ action: 'hidePreview' });
+    // No longer sends hidePreview
     moveToNextComment();
   } else if (message.action === 'regenerate') {
     regenerateCurrentReply();
@@ -57,7 +56,6 @@ function hideReplyBox() {
   }
 }
 
-// CẬP NHẬT: Loại bỏ cả comment đã reply và đã skip
 function getUnrepliedComments() {
   const allThreads = Array.from(document.querySelectorAll('ytcp-comment-thread'));
   return allThreads.filter(thread => {
@@ -66,7 +64,6 @@ function getUnrepliedComments() {
     const repliedClass = mainComment?.classList.contains('auto-replied');
     const skippedClass = mainComment?.classList.contains('auto-skipped');
 
-    // Bỏ qua nếu đã reply HOẶC đã skip
     if (repliedClass || skippedClass) return false;
     if (hasRepliesSection && hasRepliesSection.querySelector('ytcp-comment')) return false;
     return true;
@@ -78,23 +75,35 @@ async function processNextComment() {
 
   const unreplied = getUnrepliedComments();
   if (unreplied.length === 0) {
-    console.log('Không còn comment. Cuộn xuống...');
+    logToSidebar('Không tìm thấy comment, đang cuộn...');
     window.scrollBy(0, SCROLL_STEP);
-    setTimeout(processNextComment, 3000);
+    setTimeout(processNextComment, 3000); // Try again after scroll
     return;
   }
 
   currentCommentEl = unreplied[0];
   const commentText = currentCommentEl.querySelector('#content-text')?.innerText.trim();
-  if (!commentText) return;
+  if (!commentText) {
+      moveToNextComment(); // Skip empty comments
+      return;
+  }
+  
+  // 1. Tell sidebar we are loading for this specific comment
+  chrome.runtime.sendMessage({ 
+    action: 'showPreviewLoading', 
+    comment: commentText
+  });
 
   const reply = await generateReply(commentText);
   if (!reply) {
     markAsFailed(currentCommentEl);
+    // Don't hide preview, just move on. Sidebar will go back to 'waiting' state
+    // when the next comment is found.
     moveToNextComment();
     return;
   }
-
+  
+  // 2. Send the actual reply to fill the preview box
   chrome.runtime.sendMessage({ 
     action: 'showPreview', 
     reply: reply,
@@ -105,12 +114,18 @@ async function processNextComment() {
 
   if (currentMode === 'continuous') {
     setTimeout(() => {
-      autoApplyReply(reply);
-    }, 1000);
+      // Check if we are still on the same comment before auto-applying
+      if (currentCommentEl === unreplied[0]) {
+        autoApplyReply(reply);
+      }
+    }, 2000); // Increased delay slightly
   }
 }
 
-async function openReplyBox(commentEl) {
+async function openReplyBox(commentEl) { /* ... no changes ... */ }
+async function waitForReplyBoxIn(commentEl, timeout = 6000) { /* ... no changes ... */ }
+async function fillAndSendReplyIn(commentEl, replyText) { /* ... no changes ... */ }
+  async function openReplyBox(commentEl) {
   hideReplyBox();
   commentEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
   await new Promise(r => setTimeout(r, 400));
@@ -125,7 +140,6 @@ async function openReplyBox(commentEl) {
   await new Promise(r => setTimeout(r, 500));
   return true;
 }
-
 async function waitForReplyBoxIn(commentEl, timeout = 6000) {
   const start = Date.now();
   while (Date.now() - start < timeout) {
@@ -137,7 +151,6 @@ async function waitForReplyBoxIn(commentEl, timeout = 6000) {
   }
   return null;
 }
-
 async function fillAndSendReplyIn(commentEl, replyText) {
   const found = await waitForReplyBoxIn(commentEl, 6000);
   if (!found) {
@@ -163,28 +176,25 @@ async function fillAndSendReplyIn(commentEl, replyText) {
   return true;
 }
 
+// --- UPDATED ACTION HANDLERS ---
+// They no longer send 'hidePreview'
+
 async function autoApplyReply(replyText) {
   if (!currentCommentEl) return;
   const ok = await fillAndSendReplyIn(currentCommentEl, replyText);
   if (ok) markAsReplied(currentCommentEl);
   else markAsFailed(currentCommentEl);
-  chrome.runtime.sendMessage({ action: 'hidePreview' });
   moveToNextComment();
 }
 
 async function applyReplyToCurrent(replyText) {
   if (!currentCommentEl) return;
   
-  // Lấy nội dung comment gốc để gửi về cho chatbot history
   const commentText = currentCommentEl.querySelector('#content-text')?.innerText.trim();
-
   const ok = await fillAndSendReplyIn(currentCommentEl, replyText);
   
   if (ok) {
     markAsReplied(currentCommentEl);
-    
-    // ▼▼▼ LOGIC MỚI ĐƯỢC THÊM VÀO ▼▼▼
-    // Nếu gửi thành công VÀ lấy được comment gốc, gửi message về sidebar
     if (commentText) {
       chrome.runtime.sendMessage({
         action: 'addToChatHistory',
@@ -192,13 +202,9 @@ async function applyReplyToCurrent(replyText) {
         reply: replyText
       });
     }
-    // ▲▲▲ KẾT THÚC LOGIC MỚI ▲▲▲
-
   } else {
     markAsFailed(currentCommentEl);
   }
-  
-  chrome.runtime.sendMessage({ action: 'hidePreview' });
   moveToNextComment();
 }
 
@@ -207,9 +213,7 @@ async function regenerateCurrentReply() {
   const commentText = currentCommentEl.querySelector('#content-text')?.innerText.trim();
   if (!commentText) return;
   
-  chrome.runtime.sendMessage({ action: 'setLoading', loading: true });
   const newReply = await generateReply(commentText);
-  chrome.runtime.sendMessage({ action: 'setLoading', loading: false });
   
   if (newReply) {
     chrome.runtime.sendMessage({ 
@@ -217,37 +221,42 @@ async function regenerateCurrentReply() {
       reply: newReply,
       comment: commentText
     });
+  } else {
+    // If regen fails, tell sidebar to go back to a waiting state for a new comment
+    logToSidebar('Regeneration failed. Moving to next comment.');
+    moveToNextComment();
   }
 }
 
-// ĐÁNH DẤU ĐÃ TRẢ LỜI
+function markAsReplied(el) { /* ... no changes ... */ }
+function markAsSkipped(el) { /* ... no changes ... */ }
+function markAsFailed(el) { /* ... no changes ... */ }
 function markAsReplied(el) {
   const mainComment = el.querySelector('ytcp-comment#comment');
   if (mainComment) mainComment.classList.add('auto-replied');
   el.style.borderLeft = '4px solid #0f0';
 }
-
-// ĐÁNH DẤU ĐÃ SKIP (MỚI)
 function markAsSkipped(el) {
   const mainComment = el.querySelector('ytcp-comment#comment');
   if (mainComment) mainComment.classList.add('auto-skipped');
-  el.style.borderLeft = '4px solid #ffa500'; // Màu cam để phân biệt
+  el.style.borderLeft = '4px solid #ffa500';
 }
-
-// ĐÁNH DẤU LỖI
 function markAsFailed(el) {
   el.style.borderLeft = '4px solid #f00';
 }
 
+
 function moveToNextComment() {
   currentCommentEl = null;
-  window.scrollBy(0, 200);
+  // Use a shorter timeout to make transition feel faster
   setTimeout(() => {
     if (isRunning) processNextComment();
-  }, 1500);
+  }, 500); 
 }
 
-// THÊM HÀM MỚI: Lấy channelId từ URL hiện tại (tương tự sidebar.js)
+// --- UNCHANGED FUNCTIONS ---
+function getCurrentChannelId() { /* ... no changes ... */ }
+async function generateReply(commentText, retries = 3) { /* ... no changes ... */ }
 function getCurrentChannelId() {
   try {
     const url = location.href;
@@ -258,7 +267,6 @@ function getCurrentChannelId() {
     return null;
   }
 }
-
 async function generateReply(commentText, retries = 3) {
   const channelId = getCurrentChannelId();
   if (!channelId) {
@@ -267,35 +275,27 @@ async function generateReply(commentText, retries = 3) {
 
   for (let i = 0; i < retries; i++) {
     try {
-      // **SỬA**: Get 'allChatHistories' thay vì 'chatHistory', và dùng channelId để lấy history đúng
       const stored = await new Promise(resolve => {
         chrome.storage.local.get(['customPrompt', 'allChatHistories', 'contextMode'], resolve);
       });
       
-      const contextMode = stored.contextMode || 'prompt'; // Mặc định là 'prompt'
+      const contextMode = stored.contextMode || 'prompt';
       let contents = [];
 
-      // **SỬA**: Xây dựng payload `contents` dựa trên `contextMode`
       if (contextMode === 'chatbot') {
-        // --- Chế độ Chatbot: Dùng lịch sử chat làm ngữ cảnh ---
         logToSidebar('Context: Chat History');
-        
-        // Lấy history cho channel hiện tại (per-channel)
         const allHistories = stored.allChatHistories || {};
         const chatHistory = allHistories[channelId] || [];
         
-        // Thêm lịch sử chat (nếu có)
         contents = chatHistory.map(msg => ({
           role: msg.role === 'user' ? 'user' : 'model',
           parts: [{ text: msg.parts[0].text }]
         }));
         
-        // Thêm yêu cầu trả lời bình luận hiện tại
         const finalPrompt = `Based on the entire context of the conversation above, please reply to this YouTube comment briefly and appropriately:\n\nComment: "${commentText}"\n\nNote: Only the reply text is returned, no further explanation.`;
         contents.push({ role: 'user', parts: [{ text: finalPrompt }] });
 
       } else {
-        // --- Chế độ Prompt (Mặc định): Dùng prompt cố định ---
         logToSidebar('Context: Custom Prompt');
         const rawPrompt = stored.customPrompt || `You are a YouTube channel owner. Please reply to this comment in a friendly, positive, and concise manner in Vietnamese (or English if commenting in English). Only reply to the content, no explanation.\n\nComment: "{{COMMENT}}"`;
         const finalPrompt = rawPrompt.replace(/{{COMMENT}}/g, commentText);

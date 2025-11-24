@@ -1,7 +1,7 @@
 // --- START OF FILE sidebar.js ---
 
 document.addEventListener('DOMContentLoaded', () => {
-  // --- Element Selectors (no changes) ---
+  // --- Element Selectors ---
   const apiKeyToggle = document.getElementById('apiKeyToggle');
   const apiKeyContent = document.getElementById('apiKeyContent');
   const apiKeyInput = document.getElementById('apiKey');
@@ -11,13 +11,17 @@ document.addEventListener('DOMContentLoaded', () => {
   const status = document.getElementById('status');
   const preview = document.getElementById('preview');
   const commentText = document.getElementById('commentText');
+  const commentTextContent = document.getElementById('commentTextContent');
+  const commentTextPlaceholder = document.getElementById('commentTextPlaceholder');
   const replyText = document.getElementById('replyText');
+  const replySkeleton = document.getElementById('replySkeleton');
   const regenerateBtn = document.getElementById('regenerateBtn');
   const applyBtn = document.getElementById('applyBtn');
   const cancelBtn = document.getElementById('cancelBtn');
   const logBox = document.getElementById('logBox');
   const clearLog = document.getElementById('clearLog');
   const customPrompt = document.getElementById('customPrompt');
+  // ... (rest of selectors are unchanged)
   const savePromptBtn = document.getElementById('savePrompt');
   const resetPromptBtn = document.getElementById('resetPrompt');
   const promptStatus = document.getElementById('promptStatus');
@@ -37,21 +41,70 @@ document.addEventListener('DOMContentLoaded', () => {
   
   const DEFAULT_PROMPT = `Bạn là chủ kênh YouTube. Hãy trả lời bình luận này một cách thân thiện, tích cực, ngắn gọn bằng tiếng Việt (hoặc tiếng Anh nếu comment bằng tiếng Anh). Chỉ trả lời nội dung, không giải thích.\n\nBình luận: "{{COMMENT}}"`;
 
-  // --- State Variables (updated) ---
+  // --- State Variables ---
   let isRunning = false;
   let currentMode = 'continuous';
   let currentContextMode = 'prompt';
   let autoSaveReplies = true;
-  
-  // NEW: State variables for per-channel history
   let currentChannelId = null;
-  let chatHistory = []; // This will now hold the history for the *current* channel only
+  let chatHistory = [];
 
-  // === NEW: HELPER FUNCTIONS ===
+  // === NEW: PREVIEW STATE MANAGER ===
   /**
-   * Gets the YouTube Channel ID from the current tab's URL.
-   * @returns {Promise<string|null>} A promise that resolves with the channel ID or null.
+   * Manages the UI of the preview panel based on the current state.
+   * @param {'hidden' | 'waiting' | 'loading' | 'ready'} state 
+   * @param {object} [data={}] - Optional data like comment or reply text.
    */
+  function setPreviewState(state, data = {}) {
+    // preview.style.display = (state === 'hidden') ? 'none' : 'block';
+    preview.style.display =  'block';
+
+    if (state === 'hidden') return;
+
+    // Default: all buttons disabled
+    regenerateBtn.disabled = true;
+    applyBtn.disabled = true;
+    cancelBtn.disabled = true;
+
+    // Default: hide actual content, show placeholders/loaders
+    commentTextContent.style.display = 'none';
+    commentTextPlaceholder.style.display = 'block';
+    replyText.style.display = 'none';
+    replySkeleton.style.display = 'block';
+
+    switch(state) {
+      case 'waiting':
+        commentTextPlaceholder.textContent = 'Đang tìm bình luận tiếp theo...';
+        break;
+      
+      case 'loading':
+        commentTextPlaceholder.style.display = 'none';
+        commentTextContent.style.display = 'block';
+        commentTextContent.textContent = data.comment || '';
+        commentTextPlaceholder.textContent = '';
+        break;
+
+      case 'ready':
+        commentTextPlaceholder.style.display = 'none';
+        commentTextContent.style.display = 'block';
+        commentTextContent.textContent = data.comment || '';
+        replySkeleton.style.display = 'none';
+        replyText.style.display = 'block';
+        replyText.value = data.reply || '';
+        replyText.focus();
+        // Enable buttons only when ready
+        regenerateBtn.disabled = false;
+        applyBtn.disabled = false;
+        cancelBtn.disabled = false;
+        break;
+    }
+  }
+
+
+  // === INITIALIZATION & HELPERS (largely unchanged) ===
+  async function getCurrentChannelId() { /* ... no changes ... */ }
+  function disableChatbotUI(message) { /* ... no changes ... */ }
+  async function initializeSidebar() { /* ... no changes ... */ }
   async function getCurrentChannelId() {
     try {
       const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -60,51 +113,30 @@ document.addEventListener('DOMContentLoaded', () => {
         const match = url.match(/studio\.youtube\.com\/channel\/([a-zA-Z0-9_-]+)/);
         return match ? match[1] : null;
       }
-    } catch (error) {
-      console.error("Error getting channel ID:", error);
-      return null;
-    }
+    } catch (error) { console.error("Error getting channel ID:", error); return null; }
     return null;
   }
-  
-  /**
-   * Disables the chatbot UI if no channel is detected.
-   */
   function disableChatbotUI(message) {
     chatbotToggle.style.opacity = '0.5';
     chatbotToggle.style.pointerEvents = 'none';
     const originalTitle = chatbotToggle.querySelector('span').textContent;
     chatbotToggle.querySelector('span').textContent = message;
-    // Restore title after a few seconds
-    setTimeout(() => {
-        chatbotToggle.querySelector('span').textContent = originalTitle;
-    }, 4000);
+    setTimeout(() => { chatbotToggle.querySelector('span').textContent = originalTitle; }, 4000);
   }
-
-  // === UPDATED: INITIALIZATION LOGIC ===
   async function initializeSidebar() {
     currentChannelId = await getCurrentChannelId();
-
-    // Load general settings
     const result = await chrome.storage.local.get(['apiKey', 'customPrompt', 'contextMode', 'autoSaveReplies', 'allChatHistories']);
-    
     if (result.apiKey) apiKeyInput.value = result.apiKey;
     customPrompt.value = result.customPrompt || DEFAULT_PROMPT;
     promptStatus.textContent = result.customPrompt ? 'Status: Custom' : 'Status: Default';
-    
     currentContextMode = result.contextMode || 'prompt';
-    contextModeBtns.forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.contextMode === currentContextMode);
-    });
+    contextModeBtns.forEach(btn => { btn.classList.toggle('active', btn.dataset.contextMode === currentContextMode); });
     updateContextUI(currentContextMode);
-    
     autoSaveReplies = result.autoSaveReplies !== false;
     autoSaveToggle.checked = autoSaveReplies;
-
-    // Per-channel logic
     if (currentChannelId) {
       const allHistories = result.allChatHistories || {};
-      chatHistory = allHistories[currentChannelId] || []; // Load history for the current channel
+      chatHistory = allHistories[currentChannelId] || [];
       appendLog(`Loaded context for channel: ${currentChannelId.substring(0,10)}...`);
     } else {
       disableChatbotUI("Không tìm thấy kênh YouTube");
@@ -112,20 +144,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     renderChat();
   }
-  
-  // Start initialization when the sidebar is loaded
   initializeSidebar();
 
-
-  // --- Event Listeners and other functions (with necessary updates) ---
-
-  // === COLLAPSIBLES, MODE TOGGLE, CONTEXT UI (no changes) ===
-  apiKeyToggle.addEventListener('click', () => {
+  // === Event Listeners and other functions ===
+  apiKeyToggle.addEventListener('click', () => { /* ... no changes ... */ });
+  modeBtns.forEach(btn => { /* ... no changes ... */ });
+  function updateContextUI(mode) { /* ... no changes ... */ }
+  contextModeBtns.forEach(btn => { /* ... no changes ... */ });
+  saveKeyBtn.addEventListener('click', () => { /* ... no changes ... */ });
+  savePromptBtn.addEventListener('click', () => { /* ... no changes ... */ });
+  resetPromptBtn.addEventListener('click', () => { /* ... no changes ... */ });
+    apiKeyToggle.addEventListener('click', () => {
     const isOpen = apiKeyContent.style.display === 'block';
     apiKeyContent.style.display = isOpen ? 'none' : 'block';
     apiKeyToggle.classList.toggle('open', !isOpen);
   });
-
   modeBtns.forEach(btn => {
     btn.addEventListener('click', () => {
       modeBtns.forEach(b => b.classList.remove('active'));
@@ -134,12 +167,10 @@ document.addEventListener('DOMContentLoaded', () => {
       appendLog(`Mode switched to: ${currentMode}`);
     });
   });
-  
   function updateContextUI(mode) {
     promptModeContainer.style.display = (mode === 'prompt') ? 'block' : 'none';
     chatbotModeContainer.style.display = (mode === 'chatbot') ? 'block' : 'none';
   }
-
   contextModeBtns.forEach(btn => {
     btn.addEventListener('click', () => {
       contextModeBtns.forEach(b => b.classList.remove('active'));
@@ -150,8 +181,6 @@ document.addEventListener('DOMContentLoaded', () => {
       updateContextUI(currentContextMode);
     });
   });
-
-  // === SAVE KEY, PROMPT, etc. (no changes) ===
   saveKeyBtn.addEventListener('click', () => {
     const key = apiKeyInput.value.trim();
     if (key) {
@@ -163,21 +192,18 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
   });
-
   savePromptBtn.addEventListener('click', () => {
     const p = customPrompt.value.trim();
     if (p) chrome.storage.local.set({ customPrompt: p }, () => promptStatus.textContent = 'Saved!');
   });
-
   resetPromptBtn.addEventListener('click', () => {
     customPrompt.value = DEFAULT_PROMPT;
     chrome.storage.local.remove('customPrompt', () => promptStatus.textContent = 'Restored to default!');
   });
-  
-  // === TOGGLE START/STOP (no changes) ===
+
+  // === UPDATED: START/STOP LOGIC ===
   toggleBtn.addEventListener('click', () => { isRunning ? stopProcessing() : startProcessing(); });
-  function startProcessing() { /* ... no changes ... */ }
-  function stopProcessing() { /* ... no changes ... */ }
+
   function startProcessing() {
     chrome.storage.local.get(['apiKey'], (result) => {
       if (!result.apiKey) {
@@ -189,25 +215,23 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 2000);
         return;
       }
-      
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (!tabs[0]) {
-          status.textContent = 'No active tab found';
-          return;
-        }
+        if (!tabs[0]) { status.textContent = 'No active tab found'; return; }
         
         chrome.tabs.sendMessage(tabs[0].id, { action: 'start', mode: currentMode, apiKey: result.apiKey });
         
         isRunning = true;
         toggleBtn.textContent = 'Stop';
-        toggleBtn.classList.remove('btn-primary');
         toggleBtn.classList.add('btn-danger');
+        toggleBtn.classList.remove('btn-primary');
         status.textContent = `Running: ${currentMode}`;
         status.style.color = 'var(--success)';
         appendLog(`Started in ${currentMode} mode`);
+        setPreviewState('waiting'); // <-- KEY CHANGE
       });
     });
   }
+
   function stopProcessing() {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (tabs[0]) chrome.tabs.sendMessage(tabs[0].id, { action: 'stop' });
@@ -219,38 +243,38 @@ document.addEventListener('DOMContentLoaded', () => {
     toggleBtn.classList.add('btn-primary');
     status.textContent = 'Stopped';
     status.style.color = 'var(--danger)';
-    preview.style.display = 'none';
     appendLog('Stopped');
+    setPreviewState('hidden'); // <-- KEY CHANGE
   }
 
-  // === PREVIEW BUTTONS (no changes) ===
-  regenerateBtn.addEventListener('click', () => { /* ... no changes ... */ });
-  applyBtn.addEventListener('click', () => { /* ... no changes ... */ });
-  cancelBtn.addEventListener('click', () => { /* ... no changes ... */ });
-   regenerateBtn.addEventListener('click', () => {
+  // === UPDATED: PREVIEW BUTTONS ===
+  regenerateBtn.addEventListener('click', () => {
     status.textContent = 'Regenerating...';
+    setPreviewState('loading', { comment: commentTextContent.textContent }); // Re-enter loading state
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (tabs[0]) chrome.tabs.sendMessage(tabs[0].id, { action: 'regenerate' });
     });
   });
+
   applyBtn.addEventListener('click', () => {
+    setPreviewState('waiting'); // Immediately show waiting state for next comment
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (tabs[0]) chrome.tabs.sendMessage(tabs[0].id, { action: 'applyReply', reply: replyText.value });
     });
-    preview.style.display = 'none';
   });
+
   cancelBtn.addEventListener('click', () => {
+    setPreviewState('waiting'); // Immediately show waiting state for next comment
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (tabs[0]) chrome.tabs.sendMessage(tabs[0].id, { action: 'skipAndNext' });
     });
-    preview.style.display = 'none';
     appendLog('Skipped → next comment');
   });
 
-  // === LOG (no changes) ===
+  // LOG
   function appendLog(msg) { /* ... no changes ... */ }
   clearLog.addEventListener('click', () => { /* ... no changes ... */ });
-    function appendLog(msg) {
+  function appendLog(msg) {
     const t = new Date().toLocaleTimeString();
     logBox.textContent += `[${t}] ${msg}\n`;
     logBox.scrollTop = logBox.scrollHeight;
@@ -262,25 +286,22 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // === UPDATED: MESSAGE LISTENER ===
   chrome.runtime.onMessage.addListener((msg) => {
-    if (msg.action === 'showPreview') {
-      preview.style.display = 'block';
-      commentText.textContent = msg.comment;
-      replyText.value = msg.reply;
-      replyText.focus();
-      appendLog('Preview ready');
-    } else if (msg.action === 'hidePreview') {
-      preview.style.display = 'none';
+    if (msg.action === 'showPreviewLoading') {
+        setPreviewState('loading', { comment: msg.comment });
+        appendLog('Waiting for AI response...');
+    } else if (msg.action === 'showPreview') {
+        setPreviewState('ready', { comment: msg.comment, reply: msg.reply });
+        appendLog('Preview ready');
     } else if (msg.action === 'setLoading') {
-      status.textContent = msg.loading ? 'Loading...' : `Running: ${currentMode}`;
+        status.textContent = msg.loading ? 'Loading...' : `Running: ${currentMode}`;
     } else if (msg.action === 'log') {
-      appendLog(msg.text);
+        appendLog(msg.text);
     } else if (msg.action === 'addToChatHistory') {
-      // **SỬA NHẸ**: Kiểm tra currentChannelId trước khi add, để tránh error
       if (currentChannelId && currentContextMode === 'chatbot' && autoSaveReplies) {
         const { comment, reply } = msg;
         chatHistory.push({ role: 'user', parts: [{ text: comment }] });
         chatHistory.push({ role: 'model', parts: [{ text: reply }] });
-        saveChatHistory(); // This now saves to the correct channel
+        saveChatHistory();
         renderChat();
         appendLog('Manual reply saved to chat context.');
       } else if (!currentChannelId) {
@@ -289,10 +310,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // === CHATBOT AI (major updates) ===
-  
-  // Menu logic (no changes)
-  chatOptionsBtn.addEventListener('click', (event) => {
+ 
+    chatOptionsBtn.addEventListener('click', (event) => {
     event.stopPropagation();
     const isMenuOpen = chatOptionsMenu.style.display === 'block';
     chatOptionsMenu.style.display = isMenuOpen ? 'none' : 'block';
@@ -315,52 +334,41 @@ document.addEventListener('DOMContentLoaded', () => {
       setTimeout(() => { chatMessages.scrollTop = chatMessages.scrollHeight; }, 50);
     }
   });
-
-  // UPDATED: Function to save history for the current channel
   async function saveChatHistory() {
-    if (!currentChannelId) return; // Don't save if there's no channel context
+    if (!currentChannelId) return;
     try {
       const result = await chrome.storage.local.get('allChatHistories');
       const allHistories = result.allChatHistories || {};
-      allHistories[currentChannelId] = chatHistory; // Update the history for the current channel
+      allHistories[currentChannelId] = chatHistory;
       await chrome.storage.local.set({ allChatHistories: allHistories });
     } catch (error) {
       appendLog("Error saving chat history: " + error.message);
     }
   }
-
   const sendChatMessage = async () => {
-    if (!currentChannelId) {
-        appendLog("Cannot send message, no channel context.");
-        return;
-    }
+    if (!currentChannelId) { appendLog("Cannot send message, no channel context."); return; }
     const userText = chatInput.value.trim();
     if (!userText) return;
-
     chatHistory.push({ role: 'user', parts: [{ text: userText }] });
     renderChat();
     chatInput.value = '';
     appendLog('Chat (User): ' + userText);
-
     chatLoadingIndicator.style.display = 'flex';
     chatMessages.scrollTop = chatMessages.scrollHeight;
     status.textContent = 'AI is thinking...';
-
     try {
       const { apiKey } = await chrome.storage.local.get(['apiKey']);
       if (!apiKey) throw new Error('API Key is missing');
-      
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: chatHistory }) // Send only the current channel's history
+        body: JSON.stringify({ contents: chatHistory })
       });
       const data = await response.json();
-
       if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
         const aiText = data.candidates[0].content.parts[0].text.trim();
         chatHistory.push({ role: 'model', parts: [{ text: aiText }] });
-        await saveChatHistory(); // Await the save operation
+        await saveChatHistory();
         renderChat();
         appendLog('Chat (AI): ' + aiText.substring(0, 40) + '...');
       } else {
@@ -375,12 +383,10 @@ document.addEventListener('DOMContentLoaded', () => {
       chatMessages.scrollTop = chatMessages.scrollHeight;
     }
   };
-
   sendChat.addEventListener('click', sendChatMessage);
   chatInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage(); }
   });
-
   function renderChat() {
     chatMessages.innerHTML = '';
     chatHistory.forEach(msg => {
@@ -392,25 +398,19 @@ document.addEventListener('DOMContentLoaded', () => {
     chatMessages.appendChild(chatLoadingIndicator);
     chatMessages.scrollTop = chatMessages.scrollHeight;
   }
-  
-  // UPDATED: Clear history for the current channel only
   clearChatBtn.addEventListener('click', async () => {
     if (!currentChannelId) return;
-    
-    chatHistory = []; // Clear local state
+    chatHistory = [];
     renderChat();
-    
-    // Remove from storage
     try {
         const result = await chrome.storage.local.get('allChatHistories');
         const allHistories = result.allChatHistories || {};
-        delete allHistories[currentChannelId]; // Delete history for the current channel
+        delete allHistories[currentChannelId];
         await chrome.storage.local.set({ allChatHistories: allHistories });
         appendLog(`Chat history cleared for channel: ${currentChannelId.substring(0,10)}...`);
     } catch (error) {
         appendLog("Error clearing chat history: " + error.message);
     }
-    
     chatOptionsMenu.style.display = 'none';
   });
 });

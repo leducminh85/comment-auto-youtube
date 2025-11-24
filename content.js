@@ -247,38 +247,57 @@ function moveToNextComment() {
   }, 1500);
 }
 
+// THÊM HÀM MỚI: Lấy channelId từ URL hiện tại (tương tự sidebar.js)
+function getCurrentChannelId() {
+  try {
+    const url = location.href;
+    const match = url.match(/studio\.youtube\.com\/channel\/([a-zA-Z0-9_-]+)/);
+    return match ? match[1] : null;
+  } catch (error) {
+    logToSidebar("Error getting channel ID: " + error.message);
+    return null;
+  }
+}
+
 async function generateReply(commentText, retries = 3) {
+  const channelId = getCurrentChannelId();
+  if (!channelId) {
+    logToSidebar("No channel ID found. Falling back to empty history for chatbot mode.");
+  }
+
   for (let i = 0; i < retries; i++) {
     try {
-      // **UPDATE**: LẤY THÊM `contextMode` TỪ STORAGE
+      // **SỬA**: Get 'allChatHistories' thay vì 'chatHistory', và dùng channelId để lấy history đúng
       const stored = await new Promise(resolve => {
-        chrome.storage.local.get(['customPrompt', 'chatHistory', 'contextMode'], resolve);
+        chrome.storage.local.get(['customPrompt', 'allChatHistories', 'contextMode'], resolve);
       });
       
       const contextMode = stored.contextMode || 'prompt'; // Mặc định là 'prompt'
       let contents = [];
 
-      // **UPDATE**: Xây dựng payload `contents` dựa trên `contextMode`
+      // **SỬA**: Xây dựng payload `contents` dựa trên `contextMode`
       if (contextMode === 'chatbot') {
         // --- Chế độ Chatbot: Dùng lịch sử chat làm ngữ cảnh ---
         logToSidebar('Context: Chat History');
         
+        // Lấy history cho channel hiện tại (per-channel)
+        const allHistories = stored.allChatHistories || {};
+        const chatHistory = allHistories[channelId] || [];
+        
         // Thêm lịch sử chat (nếu có)
-        if (stored.chatHistory && Array.isArray(stored.chatHistory)) {
-          contents = stored.chatHistory.map(msg => ({
-            role: msg.role === 'user' ? 'user' : 'model',
-            parts: [{ text: msg.parts[0].text }]
-          }));
-        }
+        contents = chatHistory.map(msg => ({
+          role: msg.role === 'user' ? 'user' : 'model',
+          parts: [{ text: msg.parts[0].text }]
+        }));
         
         // Thêm yêu cầu trả lời bình luận hiện tại
-        const finalPrompt = `Dựa vào toàn bộ bối cảnh cuộc trò chuyện ở trên, hãy trả lời bình luận YouTube này một cách ngắn gọn và phù hợp:\n\nBình luận: "${commentText}"\n\nLưu ý: Chỉ trả về nội dung câu trả lời, không giải thích thêm.`;
+        const finalPrompt = `Based on the entire context of the conversation above, please reply to this YouTube comment briefly and appropriately:\n\nComment: "${commentText}"\n\nNote: Only the reply text is returned, no further explanation.`;
         contents.push({ role: 'user', parts: [{ text: finalPrompt }] });
 
       } else {
         // --- Chế độ Prompt (Mặc định): Dùng prompt cố định ---
         logToSidebar('Context: Custom Prompt');
-        const rawPrompt = stored.customPrompt || `Bạn là chủ kênh YouTube. Hãy trả lời bình luận này một cách thân thiện, tích cực, ngắn gọn bằng tiếng Việt (hoặc tiếng Anh nếu comment bằng tiếng Anh). Chỉ trả lời nội dung, không giải thích.\n\nBình luận: "{{COMMENT}}"`;
+        const rawPrompt = stored.customPrompt || `You are a YouTube channel owner. Please reply to this comment in a friendly, positive, and concise manner in Vietnamese (or English if commenting in English). Only reply to the content, no explanation.\n\nComment: "{{COMMENT}}"`;
         const finalPrompt = rawPrompt.replace(/{{COMMENT}}/g, commentText);
         contents.push({ role: 'user', parts: [{ text: finalPrompt }] });
       }

@@ -275,6 +275,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } else if (msg.action === 'log') {
       appendLog(msg.text);
     } else if (msg.action === 'addToChatHistory') {
+      // **SỬA NHẸ**: Kiểm tra currentChannelId trước khi add, để tránh error
       if (currentChannelId && currentContextMode === 'chatbot' && autoSaveReplies) {
         const { comment, reply } = msg;
         chatHistory.push({ role: 'user', parts: [{ text: comment }] });
@@ -282,6 +283,8 @@ document.addEventListener('DOMContentLoaded', () => {
         saveChatHistory(); // This now saves to the correct channel
         renderChat();
         appendLog('Manual reply saved to chat context.');
+      } else if (!currentChannelId) {
+        appendLog('Cannot add to history: No channel ID detected.');
       }
     }
   });
